@@ -1,0 +1,388 @@
+// Project Brain — Phase 1 schema
+// Creator intention is the source of truth. AI never silently mutates project data.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProjectType {
+  GAME
+  SOFTWARE
+  APP
+  CREATIVE
+  OTHER
+  CUSTOM
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum GenreRole {
+  PRIMARY
+  SECONDARY
+}
+
+enum NodeType {
+  FOLDER
+  MECHANIC
+  CHARACTER
+  QUEST
+  LOCATION
+  STORY_BEAT
+  SYSTEM
+  ITEM
+  FACTION
+  UI_SCREEN
+  IDEA
+  TASK
+  ACT
+  CUSTOM
+}
+
+enum NodeStatus {
+  IDEA
+  DRAFT
+  IN_PROGRESS
+  REVIEW
+  READY
+}
+
+/// Game progression phase for Phase 5 game-phase analysis.
+enum GamePhase {
+  EARLY
+  MID
+  LATE
+  ENDGAME
+}
+
+model Project {
+  id               String        @id @default(cuid())
+  name             String
+  type             ProjectType
+  customTypeLabel  String?
+  status           ProjectStatus @default(DRAFT)
+  setupCompleted   Boolean       @default(false)
+  isFavorite       Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  intents                ProjectIntentVersion[]
+  gameProfile            GameProfile?
+  genres                 ProjectGenre[]
+  designFocuses          DesignFocus[]
+  nodes                  Node[]
+  nodeRelations          NodeRelation[]
+  classifications        NodeClassification[]
+  aiAnalyses             AIAnalysis[]
+  classificationRules    ProjectClassificationRule[]
+  directionChecks        DirectionCheck[]
+  improvementSuggestions ImprovementSuggestion[]
+  chatThreads            ChatThread[]
+}
+
+/// Immutable-ish intent history. Original intent is preserved; later edits add versions.
+model ProjectIntentVersion {
+  id         String   @id @default(cuid())
+  projectId  String
+  content    String   @db.Text
+  version    Int
+  isOriginal Boolean  @default(false)
+  /// Why this version was created (edit, direction response, etc.)
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  directionChecks DirectionCheck[]
+
+  @@unique([projectId, version])
+  @@index([projectId])
+}
+
+model GameProfile {
+  id             String   @id @default(cuid())
+  projectId      String   @unique
+  customGameType String?
+  notes          String?  @db.Text
+  /// Reserved for Phase 2+ AI custom-profile analysis metadata (never auto-applied)
+  aiProfileMeta  Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+/// Catalog genre. Balancing logic must NOT be hard-coded to genre names —
+/// templates are looked up by templateKey in application code.
+model Genre {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  templateKey String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projects ProjectGenre[]
+}
+
+model ProjectGenre {
+  id        String    @id @default(cuid())
+  projectId String
+  genreId   String
+  role      GenreRole
+  createdAt DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  genre   Genre   @relation(fields: [genreId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, genreId])
+  @@index([projectId])
+}
+
+/// Hierarchical design focus. targetImportance is independent per node (0–100; need not sum to 100).
+model DesignFocus {
+  id               String   @id @default(cuid())
+  projectId        String
+  name             String
+  parentId         String?
+  targetImportance Int      @default(50)
+  actualWeight     Int      @default(0)
+  confidence       Int      @default(0)
+  sortOrder        Int      @default(0)
+  isCustom         Boolean  @default(false)
+  /// Which genre template suggested this focus (informational only)
+  templateSource   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent   DesignFocus?  @relation("FocusTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children DesignFocus[] @relation("FocusTree")
+  nodes    Node[]
+
+  @@index([projectId])
+  @@index([parentId])
+}
+
+/// Unique project component identity. A node exists once; structure is a tree via parentId.
+model Node {
+  id              String     @id @default(cuid())
+  projectId       String
+  parentId        String?
+  name            String
+  type            NodeType
+  customTypeLabel String?
+  status          NodeStatus @default(IDEA)
+  content         String?    @db.Text
+  /// Advisory AI summary from Ready analysis (creator may edit content; summary is not authority).
+  summary         String?    @db.Text
+  /// Advisory AI note on how this node affects the project intent / design goals.
+  projectImpact   String?    @db.Text
+  designFocusId   String?
+  /// Optional Early/Mid/Late/Endgame tag for Phase 5 progression analysis.
+  gamePhase       GamePhase?
+  /// Freeform canvas position (Phase 6). Null = auto-layout.
+  posX            Float?
+  posY            Float?
+  sortOrder       Int        @default(0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  project                Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent                 Node?                    @relation("NodeTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children               Node[]                   @relation("NodeTree")
+  designFocus            DesignFocus?             @relation(fields: [designFocusId], references: [id], onDelete: SetNull)
+  sourceRelations        NodeRelation[]           @relation("SourceNode")
+  targetRelations        NodeRelation[]           @relation("TargetNode")
+  classifications        NodeClassification[]
+  aiAnalyses             AIAnalysis[]
+  directionChecks        DirectionCheck[]
+  improvementSuggestions ImprovementSuggestion[]
+  chatThreads            ChatThread[]
+  images                 NodeImage[]
+
+  @@index([projectId])
+  @@index([parentId])
+  @@index([status])
+  @@index([gamePhase])
+}
+
+/// Local/dev node reference images. Files live under public/uploads (replaceable later).
+model NodeImage {
+  id        String   @id @default(cuid())
+  projectId String
+  nodeId    String
+  /// Public path, e.g. /uploads/nodes/{nodeId}/{file}
+  url       String
+  filename  String?
+  mimeType  String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([nodeId])
+}
+
+model NodeRelation {
+  id           String   @id @default(cuid())
+  projectId    String
+  sourceNodeId String
+  targetNodeId String
+  type         String
+  label        String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceNode Node    @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode Node    @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceNodeId, targetNodeId, type])
+  @@index([projectId])
+}
+
+/// Phase 2+: AI / rule / user classification of a node (never auto-mutates node fields).
+/// One Node may have many rows (e.g. Crows → Resource Acquisition 65%/96%, Automation 30%/92%).
+/// `category` identifies the DesignFocus (id or stable key); `confidence` is first-class;
+/// contribution `weight`, rejection/correction status, and reason live in `metadata` until Phase 2
+/// formalizes them. `source` distinguishes ai | user | rule. Creator overrides always win.
+model NodeClassification {
+  id         String   @id @default(cuid())
+  projectId  String
+  nodeId     String
+  category   String
+  confidence Float?
+  source     String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  node    Node    @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([nodeId])
+}
+
+/// Phase 2+: persisted AI analysis runs. Results are advisory until the creator applies them.
+model AIAnalysis {
+  id        String   @id @default(cuid())
+  projectId String
+  nodeId    String?
+  type      String
+  model     String?
+  status    String   @default("pending")
+  inputHash String?
+  result    Json?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  node    Node?   @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([nodeId])
+  @@index([type])
+}
+
+/// Phase 2+: project-specific classification rules authored/approved by the creator.
+model ProjectClassificationRule {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  rule      Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+/// Phase 2+: direction check against stored intent (advisory).
+model DirectionCheck {
+  id              String   @id @default(cuid())
+  projectId       String
+  nodeId          String?
+  intentVersionId String?
+  status          String   @default("pending")
+  result          Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project       Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  node          Node?                 @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  intentVersion ProjectIntentVersion? @relation(fields: [intentVersionId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+}
+
+/// Phase 2+: improvement suggestions. Accepted only via explicit creator action later.
+model ImprovementSuggestion {
+  id         String   @id @default(cuid())
+  projectId  String
+  nodeId     String?
+  status     String   @default("pending")
+  suggestion Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  node    Node?   @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([status])
+}
+
+/// Project AI chat thread scoped to a Structure container (or project root when contextNodeId is null).
+model ChatThread {
+  id                String   @id @default(cuid())
+  projectId         String
+  /// Current Structure Focus Space container; null = project-root chat.
+  contextNodeId     String?
+  title             String?
+  /// Attached ChatGPT share-link text or pasted transcript (never claims private sync).
+  attachedGptText   String?  @db.Text
+  attachedGptUrl    String?
+  /// share_fetch | paste | failed_share
+  attachedGptSource String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contextNode Node?         @relation(fields: [contextNodeId], references: [id], onDelete: SetNull)
+  messages    ChatMessage[]
+
+  @@index([projectId])
+  @@index([projectId, contextNodeId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  /// user | assistant | system
+  role      String
+  content   String   @db.Text
+  /// Advisory structured proposals (create_node / create_focus). Never auto-applied.
+  proposals Json?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+  @@index([createdAt])
+}
