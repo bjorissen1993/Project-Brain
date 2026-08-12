@@ -147,9 +147,31 @@ In de UI: bij HTTP of misconfiguratie toont “Doorgaan met Google” nu een fou
 
 - Projecten gemaakt op `localhost` staan in je **lokale** Postgres.
 - `https://brain.freakydev.com` heeft een **andere** database.
-- De claim-knop (of auto-claim na login) kan **niets van een andere machine ophalen**. Zonder dump→restore blijft de productielijst leeg / zonder jouw lokale projecten.
+- De claim-knop (of auto-claim na login) kan **niets van een andere machine ophalen**. Zonder export→import (of dump→restore) blijft de productielijst leeg / zonder jouw lokale projecten.
 
 Daarna claimen (of auto-claim) koppelt rijen met `userId = null` aan jouw account op **die** server.
+
+### Optie 1 — JSON export/import (aanbevolen voor Railway)
+
+Veilig op app-niveau: behoudt project/node-IDs, herstelt circulaire FKs (`Node.parentId`, `DesignFocus.parentId`) in meerdere passes, overschrijft bestaande projecten **niet**, en zet `userId = null` zodat claimen werkt. Geen `pg_dump` nodig.
+
+Volledige PowerShell-stappen: **[PROJECT-MIGRATE.md](./PROJECT-MIGRATE.md)**.
+
+```powershell
+# Lokaal exporteren (.env → lokale DATABASE_URL)
+npm run db:up
+npm run db:export-projects -- --out=brain-projects.json
+
+# Dry-run tegen Railway (geen writes)
+$env:DATABASE_URL = "<RAILWAY_DATABASE_URL>"
+npm run db:import-projects -- brain-projects.json --dry-run
+
+# Echte import
+npm run db:import-projects -- brain-projects.json
+
+# Claimen
+npm run db:claim-orphans -- --email=jij@voorbeeld.com
+```
 
 Lokale Postgres (Docker Compose):
 
@@ -162,12 +184,11 @@ Lokale Postgres (Docker Compose):
 
 Start lokaal: `npm run db:up` (of `docker compose up -d`).
 
-### Optie 1 — `pg_dump` / restore (aanbevolen)
+### Optie 2 — `pg_dump` / restore (alleen lege/wegwerp-DB)
 
-Meest compleet (alle nodes, relations, images, chat, enz.). Geschikt voor Chimera (~251 nodes).
+Meest “ruw” compleet, maar riskant bij circulaire FKs en **niet** geschikt als de target al users/auth heeft die je wilt behouden. Restore **niet** over een DB die je al wilt bewaren — `--clean` wist bestaande objecten.
 
-**Vooraf op productie:** schema klaar via `npx prisma migrate deploy` tegen productie-`DATABASE_URL`.  
-Restore **niet** over een DB die je al wilt bewaren — `--clean` wist bestaande objecten.
+**Vooraf op productie:** schema klaar via `npx prisma migrate deploy` tegen productie-`DATABASE_URL`.
 
 #### Windows (PowerShell) — kort pad
 
@@ -227,11 +248,11 @@ psql "$PRODUCTION_DATABASE_URL" -f brain-local.sql
 | Sessies | Uitloggen/inloggen opnieuw; claim-UI alleen voor ingelogde allowlist-users |
 | Meerdere users | Auto-claim-all alleen bij precies 1 user; gebruik dan handmatig claimen of `db:claim-orphans` |
 
-### Optie 2 — App Export JSON/Markdown
+### Optie 3 — UI Export JSON/Markdown (geen migratie)
 
-Op **Project Profile** kun je Markdown of JSON **downloaden**. Dat is **geen import**: er is geen UI/API om die file op een andere instance terug te zetten. Gebruik export alleen als backup/documentatie; voor migratie → optie 1.
+Op **Project Profile** kun je Markdown of JSON **downloaden**. Dat is **geen** DB-import: gebruik `db:export-projects` / `db:import-projects` voor migratie (optie 1).
 
-### Optie 3 — Productie tijdelijk op dezelfde DB
+### Optie 4 — Productie tijdelijk op dezelfde DB
 
 Niet doen voor de lange termijn: lokale Docker is niet je productiebron, en één gedeelde DB koppelt env/secrets/latency/risico onnodig.
 

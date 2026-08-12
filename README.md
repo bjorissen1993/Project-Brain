@@ -112,3 +112,5 @@ src/
 | `npm run db:seed` | Seed genre catalog from code templates |
 | `npm run db:studio` | Prisma Studio |
 | `npm run db:claim-orphans` | Assign unowned projects (`userId` null) to a user by email (`--email=…`, optional `--project=`) |
+| `npm run db:export-projects` | Export projects to JSON for DB migration (`--out=`, `--project=`) — see `docs/PROJECT-MIGRATE.md` |
+| `npm run db:import-projects` | Import JSON into `DATABASE_URL` (`--dry-run`, `--fail-on-conflict`; default skip existing ids) |
