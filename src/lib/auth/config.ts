@@ -17,8 +17,11 @@ function githubLoginFromProfile(profile: unknown): string | undefined {
 
 /**
  * Edge-safe Auth.js config (no Prisma). Used by middleware and merged into full auth.
+ * AUTH_TRUST_HOST / trustHost: required behind Coolify/nginx so Auth.js accepts the
+ * public Host header. AUTH_URL must still be the public HTTPS origin in production.
  */
 export const authConfig = {
+  trustHost: true,
   providers: [
     ...(isGoogleAuthConfigured()
       ? [

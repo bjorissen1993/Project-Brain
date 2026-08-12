@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { ChevronDown, LogOut, Settings } from "lucide-react";
 import {
   DEFAULT_LOCAL_DISPLAY_NAME,
   initialsFromDisplayName,
   readLocalDisplayName,
+  startOAuthSignIn,
   subscribeLocalDisplayName,
   writeLocalDisplayName,
 } from "@/features/auth";
@@ -46,6 +47,7 @@ export function MakerProfile({
   const [authPending, setAuthPending] = useState<ProviderId | "signout" | null>(
     null,
   );
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const authenticated = authEnabled && status === "authenticated" && session?.user;
   const name = authenticated
@@ -94,9 +96,17 @@ export function MakerProfile({
   }
 
   async function onSignIn(provider: ProviderId) {
+    setAuthError(null);
     setAuthPending(provider);
     try {
-      await signIn(provider, { callbackUrl: window.location.href });
+      const result = await startOAuthSignIn(provider);
+      if (!result.ok) {
+        setAuthError(
+          result.code === "insecure_origin"
+            ? t("landing.authNeedsHttps")
+            : result.error || t("landing.signInFailed"),
+        );
+      }
     } finally {
       setAuthPending(null);
     }
@@ -263,6 +273,14 @@ export function MakerProfile({
               <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
                 {authenticated ? t("landing.linkAccounts") : t("landing.signIn")}
               </p>
+              {authError ? (
+                <p
+                  className="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2.5 py-2 text-[11px] leading-snug text-red-200"
+                  role="alert"
+                >
+                  {authError}
+                </p>
+              ) : null}
               <div className="space-y-1.5">
                 {options.map((option) => {
                   const isLinked = linked.has(option.id);

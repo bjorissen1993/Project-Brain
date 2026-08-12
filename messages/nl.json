@@ -94,6 +94,8 @@
     "providerLinked": "Al gekoppeld aan deze gebruiker",
     "signOutNeedsSession": "Log eerst in om uit te loggen",
     "authDisabledHint": "Auth is niet geconfigureerd op deze server. Zet AUTH_SECRET en minstens één OAuth-provider (Google/GitHub).",
+    "authNeedsHttps": "Deze site draait op HTTP (Niet veilig). Google/GitHub-login vereist HTTPS. Open https://brain.freakydev.com, zet TLS aan op de host, zet AUTH_URL=https://brain.freakydev.com, en gebruik diezelfde HTTPS-URL in Google Console (origin + /api/auth/callback/google).",
+    "signInFailed": "Inloggen mislukt. Controleer AUTH_GOOGLE_*/AUTH_GITHUB_*, AUTH_SECRET, AUTH_URL en de redirect-URI’s bij Google/GitHub.",
     "viewMenu": "Weergave",
     "viewExtraLarge": "Extra grote pictogrammen",
     "viewLarge": "Grote pictogrammen",

@@ -23,3 +23,9 @@ export {
 export { AuthSessionProvider } from "./session-provider";
 export { getAuthBootstrap } from "./actions";
 export type { LinkedProvider } from "./actions";
+export {
+  isInsecureNonLocalOrigin,
+  safeAuthCallbackUrl,
+  startOAuthSignIn,
+} from "./client-sign-in";
+export type { ClientSignInResult, OAuthProviderId } from "./client-sign-in";

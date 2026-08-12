@@ -94,6 +94,8 @@
     "providerLinked": "Already linked to this user",
     "signOutNeedsSession": "Sign in first to sign out",
     "authDisabledHint": "Auth is not configured on this server. Set AUTH_SECRET and at least one OAuth provider (Google/GitHub).",
+    "authNeedsHttps": "This site is on HTTP (Not secure). Google/GitHub login needs HTTPS. Open https://brain.freakydev.com, enable TLS on the host, set AUTH_URL=https://brain.freakydev.com, and use that same HTTPS URL in Google Console (origin + /api/auth/callback/google).",
+    "signInFailed": "Sign-in failed. Check AUTH_GOOGLE_*/AUTH_GITHUB_*, AUTH_SECRET, AUTH_URL, and Google/GitHub redirect URIs.",
     "viewMenu": "View",
     "viewExtraLarge": "Extra large icons",
     "viewLarge": "Large icons",

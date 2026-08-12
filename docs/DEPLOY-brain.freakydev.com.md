@@ -3,7 +3,11 @@
 Project Brain is ready for Auth.js (Google + GitHub), allowlist access, and a linked GitHub repo per project.  
 In this repo there is **no Valorush deploy config** — treat hosting like your other freakydev apps (often Coolify / Docker / nginx on a VPS).
 
-Production URL target: `https://brain.freakydev.com`
+Production URL target: **`https://brain.freakydev.com`** (HTTPS verplicht voor Google/GitHub OAuth)
+
+> **Belangrijk:** `http://brain.freakydev.com` werkt **niet** voor Google login.
+> Google weigert productie-OAuth zonder HTTPS. Als de browser “Not secure” / HTTP toont,
+> eerst TLS aanzetten (Coolify/Cloudflare/Let’s Encrypt), daarna pas OAuth testen.
 
 ---
 
@@ -105,7 +109,7 @@ OPENAI_API_KEY="..."   # optioneel maar nodig voor AI-features
 
 ### 6. Eerste login
 
-1. Open `https://brain.freakydev.com`
+1. Open **`https://brain.freakydev.com`** (niet `http://`)
 2. Log in met Google of GitHub (account moet op de allowlist staan)
 3. In het profielmenu: koppel de andere provider terwijl je ingelogd bent
 4. Open een project → Profile → **GitHub repository** → sla `owner/name` op
@@ -116,6 +120,17 @@ OPENAI_API_KEY="..."   # optioneel maar nodig voor AI-features
 - [ ] Uitloggen → opnieuw `/login`
 - [ ] Beide providers gekoppeld aan één user (database: één `User`, twee `Account`-rijen)
 - [ ] `githubRepo` zichtbaar na refresh op Profile
+
+### 8. Google login werkt niet — checklist
+
+1. **HTTPS** — Adresbalk moet `https://brain.freakydev.com` tonen (slotje). Alleen HTTP = Google OAuth faalt.
+2. **Env op de host** — `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_URL=https://brain.freakydev.com`, `AUTH_TRUST_HOST=true`. Na wijzigen: herstarten/redeployen.
+3. **Google Console** — Authorized JavaScript origins: `https://brain.freakydev.com`  
+   Authorized redirect URI (exact): `https://brain.freakydev.com/api/auth/callback/google`
+4. **Allowlist** — `ALLOWED_EMAILS` moet het Google-account-e-mailadres bevatten (anders `/auth/denied`).
+5. **AUTH_URL** — moet exact de publieke HTTPS-URL zijn (geen trailing slash, geen `http://`).
+
+In de UI: bij HTTP of misconfiguratie toont “Doorgaan met Google” nu een foutmelding i.p.v. stil niets te doen.
 
 ---
 

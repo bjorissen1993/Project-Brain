@@ -1,7 +1,7 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { startOAuthSignIn } from "@/features/auth/client-sign-in";
 
 export function LoginForm({
   callbackUrl,
@@ -15,24 +15,30 @@ export function LoginForm({
   error?: string;
 }) {
   const [pending, setPending] = useState<"google" | "github" | null>(null);
+  const [clientError, setClientError] = useState<string | null>(null);
 
   async function onProvider(provider: "google" | "github") {
+    setClientError(null);
     setPending(provider);
     try {
-      await signIn(provider, { callbackUrl });
+      const result = await startOAuthSignIn(provider, callbackUrl);
+      if (!result.ok) {
+        setClientError(result.error);
+      }
     } finally {
       setPending(null);
     }
   }
 
   const errorMessage =
-    error === "AccessDenied" || error === "Configuration"
+    clientError ||
+    (error === "AccessDenied" || error === "Configuration"
       ? "Access denied. Your account is not on the allowlist, or auth is misconfigured."
       : error === "AllowlistEmpty"
         ? "Allowlist is empty on the server. Ask the owner to set ALLOWED_EMAILS / ALLOWED_GITHUB_USERS."
         : error
           ? `Sign-in error: ${error}`
-          : null;
+          : null);
 
   return (
     <div className="space-y-3">
