@@ -80,6 +80,63 @@ export async function claimAllUnownedProjectsAction(): Promise<ClaimResult> {
 }
 
 /**
+ * Allowlisted users: claim one unowned project by id or exact name.
+ * Only touches rows already in this server's database with userId null.
+ */
+export async function claimUnownedProjectByKeyAction(
+  key: string,
+): Promise<ClaimResult> {
+  const gate = await requireSessionUserWhenAuthEnabled();
+  if (!gate.ok) return { ok: false, error: gate.error };
+  if (!gate.user) {
+    return { ok: false, error: "Sign in required to claim projects." };
+  }
+  if (!sessionUserIsAllowlisted(gate.user)) {
+    return {
+      ok: false,
+      error: "Only allowlisted accounts can claim projects by name or id.",
+    };
+  }
+
+  const trimmed = key.trim();
+  if (!trimmed) {
+    return { ok: false, error: "Enter a project name or id." };
+  }
+
+  const byId = await prisma.project.findFirst({
+    where: { id: trimmed, userId: null },
+  });
+  const matches = byId
+    ? [byId]
+    : await prisma.project.findMany({
+        where: { name: trimmed, userId: null },
+        take: 5,
+      });
+
+  if (matches.length === 0) {
+    return {
+      ok: false,
+      error:
+        "No unowned project with that name or id on this server. Migrate the local database first if the project only exists on localhost.",
+    };
+  }
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      error: `Multiple unowned projects named "${trimmed}". Use the project id instead.`,
+    };
+  }
+
+  await prisma.project.update({
+    where: { id: matches[0].id },
+    data: { userId: gate.user.id },
+  });
+  revalidatePath("/");
+  revalidatePath("/settings");
+  return { ok: true, claimed: 1 };
+}
+
+/**
  * Post-login sync:
  * 1) Claim browser-orphan ids
  * 2) If allowlisted and this is the only user in the DB, claim all remaining orphans

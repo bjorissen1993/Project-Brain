@@ -111,3 +111,4 @@ src/
 | `npm run db:migrate` | Apply migrations (dev) |
 | `npm run db:seed` | Seed genre catalog from code templates |
 | `npm run db:studio` | Prisma Studio |
+| `npm run db:claim-orphans` | Assign unowned projects (`userId` null) to a user by email (`--email=…`, optional `--project=`) |

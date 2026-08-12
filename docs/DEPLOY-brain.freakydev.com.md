@@ -20,7 +20,7 @@ Production URL target: **`https://brain.freakydev.com`** (HTTPS verplicht voor G
 - Prisma-modellen: `User`, `Account`, `Session`, `VerificationToken`
 - Projectveld `githubRepo` (`owner/name`) + UI op Project Profile
 - Project-eigendom: `Project.userId` (nullable voor legacy). Met auth aan: inloggen verplicht om te maken; lijst toont alleen jouw projecten.
-- Na login: browser-orphans (`localStorage` `pb:orphan-project-ids`) worden gekoppeld; als jij de enige user bent (allowlist) worden alle `userId: null` projecten automatisch geclaimd. Handmatig: **Instellingen → Alle ongeclaimde projecten claimen**.
+- Na login: browser-orphans (`localStorage` `pb:orphan-project-ids`) worden gekoppeld; als jij de enige user bent (allowlist) worden alle `userId: null` projecten automatisch geclaimd. Handmatig: **Instellingen → Alle ongeclaimde projecten claimen** (of op naam/id). CLI: `npm run db:claim-orphans -- --email=…`. Claimen ziet alleen rijen in **deze** server-DB — niet localhost.
 - `.env.example` met productie-placeholders
 
 Zonder `AUTH_SECRET` + provider-secrets blijft lokale anonieme mode werken.
@@ -141,6 +141,16 @@ In de UI: bij HTTP of misconfiguratie toont “Doorgaan met Google” nu een fou
 
 ## Lokale data → productie (Valorush / Chimera)
 
+### Waarom “Claimen” offline/lokaal gemaakte projecten niet ziet
+
+**Claimen werkt alleen op projecten die al in de database van de server staan waarop je bent ingelogd.**
+
+- Projecten gemaakt op `localhost` staan in je **lokale** Postgres.
+- `https://brain.freakydev.com` heeft een **andere** database.
+- De claim-knop (of auto-claim na login) kan **niets van een andere machine ophalen**. Zonder dump→restore blijft de productielijst leeg / zonder jouw lokale projecten.
+
+Daarna claimen (of auto-claim) koppelt rijen met `userId = null` aan jouw account op **die** server.
+
 Lokale Postgres (Docker Compose):
 
 | | |
@@ -158,6 +168,27 @@ Meest compleet (alle nodes, relations, images, chat, enz.). Geschikt voor Chimer
 
 **Vooraf op productie:** schema klaar via `npx prisma migrate deploy` tegen productie-`DATABASE_URL`.  
 Restore **niet** over een DB die je al wilt bewaren — `--clean` wist bestaande objecten.
+
+#### Windows (PowerShell) — kort pad
+
+```powershell
+# 1) Lokale DB draaien + dump
+npm run db:up
+docker compose exec -T db pg_dump -U projectbrain -d projectbrain --no-owner --no-acl > brain-local.sql
+
+# 2) Restore naar productie (PRODUCTIE-URL zelf zetten; secrets niet committen/chatten)
+# Vereist: psql op PATH, of uitvoeren op de host/Coolify one-off
+$env:DATABASE_URL = "<PRODUCTION_DATABASE_URL>"
+psql $env:DATABASE_URL -f brain-local.sql
+
+# 3a) Claim via de site (allowlist): Instellingen → Alle ongeclaimde projecten claimen
+#     of één project op naam/id claimen in hetzelfde scherm
+
+# 3b) Of one-shot script tegen productie-DB (eerst één keer inloggen zodat je User-rij bestaat):
+$env:DATABASE_URL = "<PRODUCTION_DATABASE_URL>"
+npm run db:claim-orphans -- --email=jij@voorbeeld.com
+# optioneel één project: --project=Valorush   of --project=<cuid>
+```
 
 **Dump lokaal (PowerShell, via Docker):**
 
@@ -183,8 +214,18 @@ psql "$PRODUCTION_DATABASE_URL" -f brain-local.sql
 **Na restore:**
 
 1. Open `https://brain.freakydev.com` en log in (allowlist).
-2. Projecten met `userId = null` (typisch na lokale anonieme mode): **Instellingen → Alle ongeclaimde projecten claimen**, of wacht op auto-claim als jij de enige user bent.
+2. Projecten met `userId = null` (typisch na lokale anonieme mode): **Instellingen → Alle ongeclaimde projecten claimen**, of claim op naam/id, of `npm run db:claim-orphans -- --email=…` tegen productie-`DATABASE_URL`. Auto-claim-all gebeurt alleen als jij de **enige** user in die DB bent.
 3. Controleer Valorush + Chimera in de projectlijst.
+
+**Als claimen na restore nog faalt / niets toont:**
+
+| Oorzaak | Wat te checken |
+|---|---|
+| Allowlist | `ALLOWED_EMAILS` / `ALLOWED_GITHUB_USERS` bevat jouw account; anders geen claim-sectie |
+| Al een `userId` | Project hoort al bij een andere (of oude) user → niet “unowned” |
+| Verkeerde DB | Dump/restore ging naar een andere URL dan de app gebruikt |
+| Sessies | Uitloggen/inloggen opnieuw; claim-UI alleen voor ingelogde allowlist-users |
+| Meerdere users | Auto-claim-all alleen bij precies 1 user; gebruik dan handmatig claimen of `db:claim-orphans` |
 
 ### Optie 2 — App Export JSON/Markdown
 
