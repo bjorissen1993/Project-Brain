@@ -139,6 +139,63 @@ In de UI: bij HTTP of misconfiguratie toont “Doorgaan met Google” nu een fou
 
 ---
 
+## Lokale data → productie (Valorush / Chimera)
+
+Lokale Postgres (Docker Compose):
+
+| | |
+|---|---|
+| Service | `db` (`docker-compose.yml`) |
+| Poort | `5432` → host |
+| DB / user / wachtwoord | `projectbrain` / `projectbrain` / `projectbrain` |
+| Connectie | zie `.env.example` → `DATABASE_URL` (niet committen met echte secrets) |
+
+Start lokaal: `npm run db:up` (of `docker compose up -d`).
+
+### Optie 1 — `pg_dump` / restore (aanbevolen)
+
+Meest compleet (alle nodes, relations, images, chat, enz.). Geschikt voor Chimera (~251 nodes).
+
+**Vooraf op productie:** schema klaar via `npx prisma migrate deploy` tegen productie-`DATABASE_URL`.  
+Restore **niet** over een DB die je al wilt bewaren — `--clean` wist bestaande objecten.
+
+**Dump lokaal (PowerShell, via Docker):**
+
+```powershell
+npm run db:up
+docker compose exec -T db pg_dump -U projectbrain -d projectbrain --no-owner --no-acl > brain-local.sql
+```
+
+**Restore naar productie** (zet `PRODUCTION_DATABASE_URL` zelf; plak secrets niet in chat/docs):
+
+```powershell
+# Vereist: psql op je PATH, of voer dit uit op de host/Coolify one-off
+$env:PGPASSWORD = "..."   # alleen als nodig; liever connection string
+psql "$env:PRODUCTION_DATABASE_URL" -f brain-local.sql
+```
+
+Of vanuit een container die bij productie-Postgres kan:
+
+```bash
+psql "$PRODUCTION_DATABASE_URL" -f brain-local.sql
+```
+
+**Na restore:**
+
+1. Open `https://brain.freakydev.com` en log in (allowlist).
+2. Projecten met `userId = null` (typisch na lokale anonieme mode): **Instellingen → Alle ongeclaimde projecten claimen**, of wacht op auto-claim als jij de enige user bent.
+3. Controleer Valorush + Chimera in de projectlijst.
+
+### Optie 2 — App Export JSON/Markdown
+
+Op **Project Profile** kun je Markdown of JSON **downloaden**. Dat is **geen import**: er is geen UI/API om die file op een andere instance terug te zetten. Gebruik export alleen als backup/documentatie; voor migratie → optie 1.
+
+### Optie 3 — Productie tijdelijk op dezelfde DB
+
+Niet doen voor de lange termijn: lokale Docker is niet je productiebron, en één gedeelde DB koppelt env/secrets/latency/risico onnodig.
+
+---
+
 ## Lokale ontwikkeling
 
 ```bash
