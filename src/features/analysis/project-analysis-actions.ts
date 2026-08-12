@@ -16,13 +16,16 @@ function revalidateProject(projectId: string) {
   revalidatePath(`/projects/${projectId}/intelligence`);
 }
 
-export async function runImbalanceAnalysisAction(projectId: string) {
+export async function runImbalanceAnalysisAction(
+  projectId: string,
+  opts?: { locale?: "en" | "nl" },
+) {
   const snapshot = await getBalanceSnapshot(projectId);
   const balanceLines = flattenBalanceLines(snapshot.roots);
   const ai = getAIService();
   const result = await ai.analyzeImbalance(
     { projectId, balanceLines },
-    { modelTier: "standard" },
+    { modelTier: "standard", locale: opts?.locale },
   );
 
   if (!result.ok || !result.data) {
@@ -71,13 +74,16 @@ export async function runImbalanceAnalysisAction(projectId: string) {
   };
 }
 
-export async function runImprovementSuggestionsAction(projectId: string) {
+export async function runImprovementSuggestionsAction(
+  projectId: string,
+  opts?: { locale?: "en" | "nl" },
+) {
   const snapshot = await getBalanceSnapshot(projectId);
   const balanceLines = flattenBalanceLines(snapshot.roots);
   const ai = getAIService();
   const result = await ai.generateImprovementSuggestions(
     { projectId, balanceLines },
-    { modelTier: "standard" },
+    { modelTier: "standard", locale: opts?.locale },
   );
 
   if (!result.ok || !result.data) {

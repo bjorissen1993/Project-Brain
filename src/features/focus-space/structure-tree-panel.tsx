@@ -6,13 +6,23 @@ import { buildNodeTree } from "@/features/projects/tree";
 import { useFocusWorkspace } from "./focus-interaction-context";
 import type { StructureViewMode } from "./structure-href";
 
-/** Full Project Structure tree inside the Structure workspace (not a separate destination). */
+/** Full Project Structure tree inside the Structure workspace (left pane of Tree view). */
 export function StructureTreePanel({
   focusNodeId,
   view,
+  onNodeContextMenu,
+  onPaneContextMenu,
+  linkToolActive,
+  linkSourceId,
+  onLinkPick,
 }: {
   focusNodeId: string | null;
   view: StructureViewMode;
+  onNodeContextMenu?: (nodeId: string, x: number, y: number) => void;
+  onPaneContextMenu?: (x: number, y: number) => void;
+  linkToolActive?: boolean;
+  linkSourceId?: string | null;
+  onLinkPick?: (id: string) => void;
 }) {
   const { projectId, nodes, colorFor, iconFor } = useFocusWorkspace();
   const tree = useMemo(
@@ -46,9 +56,19 @@ export function StructureTreePanel({
       />
       <div className="relative z-[1] min-h-0 flex-1 overflow-y-auto px-1 py-1 sm:px-2">
         {tree.length === 0 ? (
-          <p className="px-3 py-12 text-center text-sm text-muted">
-            No content nodes yet. Add an element with + in Blobs view.
-          </p>
+          <div
+            className="flex h-full min-h-[12rem] items-center justify-center"
+            onContextMenu={(e) => {
+              if (!onPaneContextMenu) return;
+              e.preventDefault();
+              onPaneContextMenu(e.clientX, e.clientY);
+            }}
+          >
+            <p className="px-3 py-12 text-center text-sm text-muted">
+              No content nodes yet. Right-click to create, or use + in Blobs
+              view.
+            </p>
+          </div>
         ) : (
           <NodeTree
             projectId={projectId}
@@ -56,10 +76,15 @@ export function StructureTreePanel({
             selectedId={focusNodeId ?? undefined}
             embedded
             linkMode="structure"
-            structureView={view}
+            structureView={view === "blobs" ? "tree" : view}
             expandToSelected
             colorFor={colorFor}
             iconFor={iconFor}
+            onNodeContextMenu={onNodeContextMenu}
+            onPaneContextMenu={onPaneContextMenu}
+            linkToolActive={linkToolActive}
+            linkSourceId={linkSourceId}
+            onLinkPick={onLinkPick}
           />
         )}
       </div>

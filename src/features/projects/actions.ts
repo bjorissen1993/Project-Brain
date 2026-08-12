@@ -13,6 +13,7 @@ import {
   toggleProjectFavoriteSchema,
   updateIntentSchema,
   updateProjectGenresSchema,
+  updateProjectGithubRepoSchema,
 } from "@/lib/validation";
 import { getGenreTemplate } from "@/features/game-profile/genre-templates";
 import { assessGenreIntentAlignment } from "@/features/ai/genre-intent-alignment-schema";
@@ -883,4 +884,43 @@ export async function deleteProjectAction(raw: unknown) {
 
   revalidatePath("/");
   return { ok: true as const };
+}
+
+function normalizeGithubRepo(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const urlMatch = trimmed.match(
+    /^https?:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/?$/,
+  );
+  if (urlMatch?.[1]) return urlMatch[1];
+  return trimmed.replace(/^\/+|\/+$/g, "");
+}
+
+/** Link or unlink a GitHub repository (owner/name) on a project. */
+export async function updateProjectGithubRepoAction(raw: unknown) {
+  const parsed = updateProjectGithubRepoSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false as const,
+      error: parsed.error.issues[0]?.message ?? "Invalid GitHub repo",
+    };
+  }
+
+  const githubRepo = normalizeGithubRepo(parsed.data.githubRepo);
+  const project = await prisma.project.findUnique({
+    where: { id: parsed.data.projectId },
+    select: { id: true },
+  });
+  if (!project) {
+    return { ok: false as const, error: "Project not found" };
+  }
+
+  await prisma.project.update({
+    where: { id: parsed.data.projectId },
+    data: { githubRepo },
+  });
+
+  revalidatePath(`/projects/${parsed.data.projectId}/profile`);
+  revalidatePath(`/projects/${parsed.data.projectId}`);
+  return { ok: true as const, githubRepo };
 }

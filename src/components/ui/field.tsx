@@ -1,5 +1,10 @@
 import { cn } from "@/lib/utils";
-import type { InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from "react";
+import {
+  forwardRef,
+  type InputHTMLAttributes,
+  type TextareaHTMLAttributes,
+  type SelectHTMLAttributes,
+} from "react";
 
 export function Label({
   children,
@@ -30,12 +35,14 @@ export function Input({
   return <input className={cn(controlClass, className)} {...props} />;
 }
 
-export function Textarea({
-  className,
-  ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(controlClass, className)} {...props} />;
-}
+export const Textarea = forwardRef<
+  HTMLTextAreaElement,
+  TextareaHTMLAttributes<HTMLTextAreaElement>
+>(function Textarea({ className, ...props }, ref) {
+  return (
+    <textarea ref={ref} className={cn(controlClass, className)} {...props} />
+  );
+});
 
 export function Select({
   className,

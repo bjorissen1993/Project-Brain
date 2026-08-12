@@ -445,13 +445,12 @@ export function FocusBlobs({
       relations: workspaceRelations ?? [],
       aiEvidence: workspaceAiEvidence ?? [],
     });
-    const focusId =
-      relationMode === "focused" ? relationFocusId ?? hoveredId : null;
+    // Focused mode follows live hover only (avoids sticky overlay after leave).
+    const focusId = relationMode === "focused" ? hoveredId : null;
     return filterRelationsForMode(scored, relationMode, focusId);
   }, [
     relationsEnabled,
     relationMode,
-    relationFocusId,
     hoveredId,
     layoutSlices,
     workspaceNodes,
@@ -460,7 +459,7 @@ export function FocusBlobs({
     workspaceAiEvidence,
   ]);
 
-  const relationEmphasisId = relationFocusId ?? hoveredId ?? null;
+  const relationEmphasisId = hoveredId ?? relationFocusId ?? null;
 
   // Restore session positions after mount (async) — SSR + first paint stay deterministic.
   useEffect(() => {
@@ -1507,6 +1506,13 @@ export function FocusBlobs({
         const onShellPointerLeave = () => {
           if (!drag) {
             onHover(null);
+            // Clear soft-focus with hover so Focused curves don’t stick / glitch layout.
+            if (
+              relationsEnabled &&
+              workspace?.relationFocusId === slice.id
+            ) {
+              workspace.setRelationFocusId(null);
+            }
           }
         };
 

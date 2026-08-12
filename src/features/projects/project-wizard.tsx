@@ -5,12 +5,32 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FieldError, Input, Label } from "@/components/ui/field";
+import { useT, type MessageKey } from "@/features/i18n";
 import { createProjectAction } from "@/features/projects/actions";
 import { iconKeyForProjectType, PbIcon } from "@/lib/icons";
 import { PROJECT_TYPE_OPTIONS, type ProjectType } from "@/types";
 import { cn } from "@/lib/utils";
 
+const TYPE_LABEL_KEY: Record<ProjectType, MessageKey> = {
+  GAME: "landing.typeGame",
+  SOFTWARE: "landing.typeSoftware",
+  APP: "landing.typeApp",
+  CREATIVE: "landing.typeCreative",
+  OTHER: "landing.typeOther",
+  CUSTOM: "landing.typeCustom",
+};
+
+const TYPE_DESC_KEY: Record<ProjectType, MessageKey> = {
+  GAME: "setup.typeGameDesc",
+  SOFTWARE: "setup.typeSoftwareDesc",
+  APP: "setup.typeAppDesc",
+  CREATIVE: "setup.typeCreativeDesc",
+  OTHER: "setup.typeOtherDesc",
+  CUSTOM: "setup.typeCustomDesc",
+};
+
 export function ProjectWizard() {
+  const t = useT();
   const router = useRouter();
   const [type, setType] = useState<ProjectType | null>(null);
   const [name, setName] = useState("");
@@ -33,14 +53,14 @@ export function ProjectWizard() {
 
   const continueLabel =
     selected?.setupTier === "full"
-      ? "Continue to game setup"
-      : "Continue to project setup";
+      ? t("setup.continueGame")
+      : t("setup.continueProject");
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-12">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
-          Project setup
+          {t("setup.eyebrow")}
         </p>
         <Button
           type="button"
@@ -49,16 +69,14 @@ export function ProjectWizard() {
           onClick={requestCancel}
           className="text-xs"
         >
-          Cancel · Back to home
+          {t("setup.cancelHome")}
         </Button>
       </div>
       <h1 className="mt-3 max-w-3xl font-display text-4xl leading-tight">
-        What type of project are you creating?
+        {t("setup.whatType")}
       </h1>
       <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
-        Your stated intention remains the source of truth. Project Brain helps you
-        structure and inspect design decisions — it never silently changes your data.
-        No project is created until you continue to setup.
+        {t("setup.intro")}
       </p>
 
       <div className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -95,7 +113,9 @@ export function ProjectWizard() {
                       className="h-5 w-5 md:h-8 md:w-8"
                     />
                   </span>
-                  <span className="font-medium">{option.label}</span>
+                  <span className="font-medium">
+                    {t(TYPE_LABEL_KEY[option.value])}
+                  </span>
                 </div>
                 <span
                   className={cn(
@@ -103,10 +123,14 @@ export function ProjectWizard() {
                     option.setupTier === "full" ? "text-accent" : "text-muted",
                   )}
                 >
-                  {option.setupTier === "full" ? "Full" : "General"}
+                  {option.setupTier === "full"
+                    ? t("setup.badgeFull")
+                    : t("setup.badgeGeneral")}
                 </span>
               </div>
-              <p className="mt-2 text-sm text-muted">{option.description}</p>
+              <p className="mt-2 text-sm text-muted">
+                {t(TYPE_DESC_KEY[option.value])}
+              </p>
             </button>
           );
         })}
@@ -116,30 +140,28 @@ export function ProjectWizard() {
         <div className="mt-10 max-w-2xl space-y-4 border-t border-border pt-8">
           {selected?.setupTier === "general" ? (
             <div className="surface-card p-4 text-sm text-muted">
-              General setup covers Intent, Project Areas, and Design Focus.
-              Genre templates and game-specific balance tools stay on{" "}
-              <strong className="text-foreground">Game</strong> projects.
+              {t("setup.generalInfo", { game: t("landing.typeGame") })}
             </div>
           ) : null}
 
           <div>
-            <Label htmlFor="projectName">Project name</Label>
+            <Label htmlFor="projectName">{t("setup.projectName")}</Label>
             <Input
               id="projectName"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Ashen Circuit"
+              placeholder={t("setup.namePlaceholder")}
             />
           </div>
 
           {type === "CUSTOM" ? (
             <div>
-              <Label htmlFor="customType">Custom type label</Label>
+              <Label htmlFor="customType">{t("setup.customTypeLabel")}</Label>
               <Input
                 id="customType"
                 value={customTypeLabel}
                 onChange={(e) => setCustomTypeLabel(e.target.value)}
-                placeholder="Describe your project type"
+                placeholder={t("setup.customTypePlaceholder")}
               />
             </div>
           ) : null}
@@ -167,7 +189,7 @@ export function ProjectWizard() {
                 });
               }}
             >
-              {pending ? "Creating…" : continueLabel}
+              {pending ? t("setup.creating") : continueLabel}
             </Button>
           </div>
         </div>
@@ -175,10 +197,10 @@ export function ProjectWizard() {
 
       <ConfirmDialog
         open={leaveOpen}
-        title="Leave project setup?"
-        message="Your type and name selections will be lost."
-        cancelLabel="Stay"
-        confirmLabel="Leave"
+        title={t("setup.leaveTitle")}
+        message={t("setup.leaveMessage")}
+        cancelLabel={t("setup.stay")}
+        confirmLabel={t("setup.leave")}
         onCancel={() => setLeaveOpen(false)}
         onConfirm={() => {
           setLeaveOpen(false);

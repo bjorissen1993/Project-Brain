@@ -1,62 +1,63 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { BrandMark } from "@/components/brand/brand-mark";
+import { useT, type MessageKey } from "@/features/i18n";
 import { cn } from "@/lib/utils";
 
 /** Unique hue per slide — no repeated blues/greens. */
 type SlideAccent = "navy" | "teal" | "violet" | "amber" | "rose" | "charcoal";
 
-type Slide = {
+type SlideDef = {
   id: string;
-  eyebrow: string;
-  title: string;
-  body: string;
+  eyebrow: MessageKey;
+  title: MessageKey;
+  body: MessageKey;
   accent: SlideAccent;
 };
 
-const SLIDES: Slide[] = [
+const SLIDE_DEFS: SlideDef[] = [
   {
     id: "brand",
-    eyebrow: "Project Brain",
-    title: "Keep game design intent clear",
-    body: "A professional workspace to structure what your game should become — without silent AI rewrites of your data.",
+    eyebrow: "hero.slide1Eyebrow",
+    title: "hero.slide1Title",
+    body: "hero.slide1Body",
     accent: "navy",
   },
   {
     id: "structure",
-    eyebrow: "Structure",
-    title: "Organize where ideas live",
-    body: "Project Areas become Focus Space folders so systems, story, and content stay navigable as the project grows.",
+    eyebrow: "hero.slide2Eyebrow",
+    title: "hero.slide2Title",
+    body: "hero.slide2Body",
     accent: "teal",
   },
   {
     id: "focus",
-    eyebrow: "Design focus",
-    title: "Define what the game emphasizes",
-    body: "Design Focuses capture target importance separately from structure — criteria you can inspect, not folders you bury ideas in.",
+    eyebrow: "hero.slide3Eyebrow",
+    title: "hero.slide3Title",
+    body: "hero.slide3Body",
     accent: "violet",
   },
   {
     id: "intent",
-    eyebrow: "Intent",
-    title: "Your wording stays the source of truth",
-    body: "Capture the experience you want players to feel. Later analysis and suggestions remain advisory until you accept them.",
+    eyebrow: "hero.slide4Eyebrow",
+    title: "hero.slide4Title",
+    body: "hero.slide4Body",
     accent: "amber",
   },
   {
     id: "relations",
-    eyebrow: "Relations",
-    title: "See how components connect",
-    body: "Link mechanics, characters, quests, and systems so dependencies and design pressure are visible — not buried in notes.",
+    eyebrow: "hero.slide5Eyebrow",
+    title: "hero.slide5Title",
+    body: "hero.slide5Body",
     accent: "rose",
   },
   {
     id: "ai",
-    eyebrow: "AI chat",
-    title: "Ask with context, decide yourself",
-    body: "Chat against project context for suggestions and checks. Project Brain never silently mutates your structure or intent.",
+    eyebrow: "hero.slide6Eyebrow",
+    title: "hero.slide6Title",
+    body: "hero.slide6Body",
     accent: "charcoal",
   },
 ];
@@ -96,24 +97,37 @@ function usePrefersReducedMotion() {
 }
 
 export function HeroSlideshow({ collapsed = false }: { collapsed?: boolean }) {
+  const t = useT();
   const labelId = useId();
   const reducedMotion = usePrefersReducedMotion();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  const slide = SLIDES[index] ?? SLIDES[0]!;
+  const slides = useMemo(
+    () =>
+      SLIDE_DEFS.map((def) => ({
+        id: def.id,
+        accent: def.accent,
+        eyebrow: t(def.eyebrow),
+        title: t(def.title),
+        body: t(def.body),
+      })),
+    [t],
+  );
+
+  const slide = slides[index] ?? slides[0]!;
   const autoplay = !reducedMotion && !paused && !collapsed;
 
   useEffect(() => {
     if (!autoplay) return;
     const id = window.setInterval(() => {
-      setIndex((i) => (i + 1) % SLIDES.length);
+      setIndex((i) => (i + 1) % slides.length);
     }, AUTO_MS);
     return () => window.clearInterval(id);
-  }, [autoplay, index]);
+  }, [autoplay, index, slides.length]);
 
   function go(delta: number) {
-    setIndex((i) => (i + delta + SLIDES.length) % SLIDES.length);
+    setIndex((i) => (i + delta + slides.length) % slides.length);
   }
 
   return (
@@ -156,7 +170,7 @@ export function HeroSlideshow({ collapsed = false }: { collapsed?: boolean }) {
             />
 
             <p id={labelId} className="sr-only">
-              What Project Brain does
+              {slide.title}
             </p>
 
             <div
@@ -185,7 +199,7 @@ export function HeroSlideshow({ collapsed = false }: { collapsed?: boolean }) {
             <div className="mt-6 flex items-center justify-center gap-3">
               <button
                 type="button"
-                aria-label="Previous slide"
+                aria-label={t("hero.prev")}
                 tabIndex={collapsed ? -1 : undefined}
                 onClick={() => go(-1)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius)] border border-white/15 bg-black/25 text-white/70 transition hover:border-white/30 hover:text-foreground"
@@ -193,8 +207,12 @@ export function HeroSlideshow({ collapsed = false }: { collapsed?: boolean }) {
                 <ChevronLeft className="h-4 w-4" />
               </button>
 
-              <div className="flex items-center gap-1.5" role="tablist" aria-label="Slides">
-                {SLIDES.map((item, i) => {
+              <div
+                className="flex items-center gap-1.5"
+                role="tablist"
+                aria-label={t("hero.slides")}
+              >
+                {slides.map((item, i) => {
                   const active = i === index;
                   return (
                     <button
@@ -202,7 +220,7 @@ export function HeroSlideshow({ collapsed = false }: { collapsed?: boolean }) {
                       type="button"
                       role="tab"
                       aria-selected={active}
-                      aria-label={`Slide ${i + 1}: ${item.title}`}
+                      aria-label={`${i + 1}: ${item.title}`}
                       tabIndex={collapsed ? -1 : undefined}
                       onClick={() => setIndex(i)}
                       className={cn(
@@ -218,7 +236,7 @@ export function HeroSlideshow({ collapsed = false }: { collapsed?: boolean }) {
 
               <button
                 type="button"
-                aria-label="Next slide"
+                aria-label={t("hero.next")}
                 tabIndex={collapsed ? -1 : undefined}
                 onClick={() => go(1)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius)] border border-white/15 bg-black/25 text-white/70 transition hover:border-white/30 hover:text-foreground"
@@ -226,12 +244,6 @@ export function HeroSlideshow({ collapsed = false }: { collapsed?: boolean }) {
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-
-            {reducedMotion ? (
-              <p className="mt-3 text-[11px] text-white/55">
-                Auto-advance paused for reduced motion
-              </p>
-            ) : null}
           </div>
         </div>
       </div>

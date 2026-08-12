@@ -10,7 +10,7 @@ export default async function GraphPage({
   const { projectId } = await params;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { id: true },
+    select: { id: true, name: true },
   });
   if (!project) notFound();
 
@@ -39,6 +39,11 @@ export default async function GraphPage({
   ]);
 
   return (
-    <GraphView projectId={projectId} nodes={nodes} relations={relations} />
+    <GraphView
+      projectId={projectId}
+      projectName={project.name}
+      nodes={nodes}
+      relations={relations}
+    />
   );
 }

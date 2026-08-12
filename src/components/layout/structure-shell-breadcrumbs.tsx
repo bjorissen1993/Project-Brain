@@ -9,6 +9,7 @@ import {
   structureFocusHref,
   type StructureViewMode,
 } from "@/features/focus-space/structure-href";
+import { useT } from "@/features/i18n";
 
 type Crumb = { id: string | null; name: string };
 
@@ -82,6 +83,7 @@ function EllipsisMenu({
   crumbs: Crumb[];
   view: StructureViewMode;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -109,7 +111,7 @@ function EllipsisMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
-        aria-label="Show hidden path segments"
+        aria-label={t("structure.hiddenPath")}
         onClick={() => setOpen((v) => !v)}
         className="rounded-[var(--radius)] px-2 py-0.5 text-sm font-medium text-muted transition-colors hover:bg-muted-bg hover:text-foreground"
       >
@@ -147,6 +149,7 @@ export function StructureShellBreadcrumbs({
   projectId: string;
   projectName: string;
 }) {
+  const t = useT();
   const pathname = usePathname() ?? "";
   const searchParams = useSearchParams();
   const workspace = useOptionalFocusWorkspace();
@@ -182,8 +185,8 @@ export function StructureShellBreadcrumbs({
         /
       </span>
       <nav
-        aria-label="Project structure path"
-        className="flex min-w-0 items-center gap-0.5 overflow-visible"
+        aria-label={t("structure.structurePath")}
+        className="flex min-w-0 items-center gap-0.5 overflow-x-auto scrollbar-thin"
       >
         {collapse ? (
           <>

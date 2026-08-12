@@ -209,7 +209,10 @@ export function FocusCompositionPie({
     : null;
 
   return (
-    <div className="relative mx-auto w-fit">
+    <div
+      className="relative mx-auto"
+      style={{ width: size + 16, height: size + 16 }}
+    >
       <svg
         ref={svgRef}
         width={size}
@@ -217,7 +220,7 @@ export function FocusCompositionPie({
         viewBox={`0 0 ${size} ${size}`}
         role="img"
         aria-label="Composition of current focus level"
-        className="overflow-visible"
+        className="absolute left-2 top-2 overflow-visible"
         onPointerLeave={clearHover}
         onPointerMove={(e) => updateFromPointer(e.clientX, e.clientY)}
         onClick={(e) => {
@@ -265,8 +268,8 @@ export function FocusCompositionPie({
         <div
           className="pointer-events-none absolute z-20 w-48 rounded-[var(--radius)] border border-border-strong bg-panel px-2.5 py-2 text-[11px] shadow-lg"
           style={{
-            left: Math.min(tooltip.x + 12, size - 8),
-            top: Math.max(8, tooltip.y - 8),
+            left: Math.min(tooltip.x + 20, size),
+            top: Math.max(8, tooltip.y),
             transform: "translateY(-100%)",
           }}
         >
@@ -311,6 +314,8 @@ export function FocusCompositionLegend({
   onSelect,
   colorFor,
   onColorChange,
+  collapsed = false,
+  focusedId = null,
 }: {
   slices: FocusPieSlice[];
   hoveredId: string | null;
@@ -319,19 +324,33 @@ export function FocusCompositionLegend({
   colorFor?: (focusId: string) => string;
   /** When set, shows a compact color control per row. */
   onColorChange?: (focusId: string, color: string | null) => void;
+  /** When true, only the focused row is shown (if any). */
+  collapsed?: boolean;
+  /** Preferred row when collapsed (hovered / relation focus). */
+  focusedId?: string | null;
 }) {
   if (slices.length === 0) return null;
 
+  const visible = collapsed
+    ? slices.length === 1
+      ? slices
+      : slices.filter((s) => s.id === (focusedId ?? hoveredId))
+    : slices;
+
+  if (collapsed && visible.length === 0) {
+    return null;
+  }
+
   return (
-    <ul className="mt-4 space-y-1">
-      {slices.map((slice) => {
+    <ul className="mt-3 space-y-1">
+      {visible.map((slice) => {
         const active = hoveredId === slice.id;
         const color = colorFor?.(slice.id) ?? defaultFocusColor(slice.id);
         return (
-          <li key={slice.id}>
+          <li key={slice.id} className="h-8">
             <div
               className={cn(
-                "flex w-full items-center gap-2 rounded-[var(--radius)] px-2 py-1.5 text-xs transition-colors duration-150",
+                "flex h-8 w-full items-center gap-2 rounded-[var(--radius)] px-2 text-xs transition-colors duration-150",
                 active
                   ? "bg-muted-bg text-foreground"
                   : "text-muted hover:bg-muted-bg/70 hover:text-foreground",

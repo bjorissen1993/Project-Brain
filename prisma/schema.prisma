@@ -71,6 +71,8 @@ model Project {
   status           ProjectStatus @default(DRAFT)
   setupCompleted   Boolean       @default(false)
   isFavorite       Boolean       @default(false)
+  /// Linked GitHub repository as "owner/name" (optional).
+  githubRepo       String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -86,6 +88,60 @@ model Project {
   directionChecks        DirectionCheck[]
   improvementSuggestions ImprovementSuggestion[]
   chatThreads            ChatThread[]
+}
+
+// --- Auth.js (NextAuth v5) models ---
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  /// Cached GitHub login when a GitHub account is linked.
+  githubUsername String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 /// Immutable-ish intent history. Original intent is preserved; later edits add versions.

@@ -3,6 +3,7 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useT } from "@/features/i18n";
 import { cn } from "@/lib/utils";
 import {
   effectiveClassificationWeight,
@@ -152,6 +153,7 @@ function FocusProgressRow({
   projectId: string;
   viewMode: ItemsViewMode;
 }) {
+  const t = useT();
   const fillSources = fillSourcesByFocus.get(node.id) ?? [];
   const hasChildren = node.children.length > 0;
   const isOpen = expanded.has(node.id);
@@ -225,18 +227,18 @@ function FocusProgressRow({
                 {node.name}
               </Link>
               <p className="mt-0.5 text-xs text-muted">
-                {isCards ? (
-                  <>
-                    {node.rawActualWeight} / {node.targetImportance} pts ·{" "}
-                    {sharePct}% of pool
-                  </>
-                ) : (
-                  <>
-                    target {node.targetImportance} pts ({sharePct}% of pool) ·
-                    filled {node.rawActualWeight} / {node.targetImportance} ·{" "}
-                    {node.contributingNodeCount} Ready with content
-                  </>
-                )}
+                {isCards
+                  ? t("designFocus.ptsOfPool", {
+                      raw: node.rawActualWeight,
+                      target: node.targetImportance,
+                      share: sharePct,
+                    })
+                  : t("designFocus.listMeta", {
+                      target: node.targetImportance,
+                      share: sharePct,
+                      raw: node.rawActualWeight,
+                      ready: node.contributingNodeCount,
+                    })}
               </p>
             </div>
           </div>
@@ -247,7 +249,13 @@ function FocusProgressRow({
                 statusTextClass(node.status),
               )}
             >
-              {node.status}
+              {node.status === "green"
+                ? t("balance.green")
+                : node.status === "orange"
+                  ? t("balance.orange")
+                  : node.status === "red"
+                    ? t("balance.red")
+                    : t("balance.neutral")}
             </p>
             <p className="text-muted">{node.directionLabel}</p>
           </div>
@@ -256,7 +264,7 @@ function FocusProgressRow({
         <div className={cn("mt-3 space-y-2", isCards && "flex-1")}>
           <div>
             <div className="mb-1 flex justify-between text-[10px] uppercase tracking-wide text-muted">
-              <span>points filled</span>
+              <span>{t("designFocus.pointsFilled")}</span>
               <span>
                 {node.rawActualWeight} / {node.targetImportance} ({fillTowardTarget}
                 %)
@@ -275,10 +283,12 @@ function FocusProgressRow({
           {!isCards || showFillSources ? (
             <div>
               <div className="mb-1 flex justify-between text-[10px] uppercase tracking-wide text-muted">
-                <span>share of level</span>
+                <span>{t("designFocus.shareOfLevel")}</span>
                 <span>
-                  actual {node.actualWeight}% · target{" "}
-                  {node.normalizedTargetWeight}%
+                  {t("designFocus.actualTarget", {
+                    actual: node.actualWeight,
+                    target: node.normalizedTargetWeight,
+                  })}
                 </span>
               </div>
               <div className="relative h-2 overflow-hidden rounded-full bg-muted-bg">
@@ -292,7 +302,9 @@ function FocusProgressRow({
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-foreground/70"
                   style={{ left: `calc(${barTargetShare}% - 1px)` }}
-                  title={`Normalized target ${node.normalizedTargetWeight}%`}
+                  title={t("balance.normTarget", {
+                    value: node.normalizedTargetWeight,
+                  })}
                 />
               </div>
             </div>
@@ -316,12 +328,11 @@ function FocusProgressRow({
         {showFillSources ? (
           <div className="mt-2 space-y-1 border-t border-border pt-2 text-xs text-muted">
             <p className="text-[10px] uppercase tracking-wide">
-              Review fill sources
+              {t("designFocus.reviewFillSources")}
             </p>
             {fillSources.length === 0 ? (
               <p className="text-muted">
-                No Ready nodes with enough content (≥{MIN_FILL_CONTENT_CHARS}{" "}
-                chars) contribute here.
+                {t("designFocus.noFillSources", { minChars: MIN_FILL_CONTENT_CHARS })}
               </p>
             ) : (
               <ul className="space-y-0.5">
@@ -335,12 +346,19 @@ function FocusProgressRow({
                     </Link>
                     <span className="tabular-nums">
                       {src.effectiveWeight <= 0
-                        ? `0 pts (classified ${Math.round(src.rawWeight)}, needs content)`
+                        ? t("designFocus.ptsClassified", {
+                            raw: Math.round(src.rawWeight),
+                          })
                         : src.effectiveWeight < src.rawWeight
-                          ? `${Math.round(src.effectiveWeight)} pts (of ${Math.round(src.rawWeight)})`
-                          : `${Math.round(src.effectiveWeight)} pts`}
+                          ? t("designFocus.ptsOf", {
+                              effective: Math.round(src.effectiveWeight),
+                              raw: Math.round(src.rawWeight),
+                            })
+                          : t("designFocus.pts", {
+                              pts: Math.round(src.effectiveWeight),
+                            })}
                       {" · "}
-                      {src.contentLength} chars
+                      {t("designFocus.chars", { count: src.contentLength })}
                     </span>
                   </li>
                 ))}
@@ -368,6 +386,7 @@ function CollapsibleProjectIntent({
   intentText: string;
   projectId: string;
 }) {
+  const t = useT();
   const collapsed = useSyncExternalStore(
     subscribeIntentCollapsed,
     readIntentCollapsed,
@@ -388,10 +407,10 @@ function CollapsibleProjectIntent({
         aria-expanded={!collapsed}
       >
         <span className="text-xs uppercase tracking-wide text-muted">
-          Project intent
+          {t("designFocus.projectIntent")}
         </span>
         <span className="text-xs font-semibold text-muted">
-          {collapsed ? "Show ▾" : "Hide ▴"}
+          {collapsed ? t("common.show") : t("common.hide")}
         </span>
       </button>
       {collapsed ? (
@@ -406,7 +425,7 @@ function CollapsibleProjectIntent({
           href={`/projects/${projectId}/profile`}
           className="text-accent underline"
         >
-          Edit in Profile
+          {t("designFocus.editInProfile")}
         </Link>
       </p>
     </div>
@@ -418,6 +437,7 @@ export function DesignFocusProgressDashboard({
 }: {
   focusId?: string | null;
 }) {
+  const t = useT();
   const router = useRouter();
   const {
     projectId,
@@ -533,20 +553,30 @@ export function DesignFocusProgressDashboard({
     const parts: string[] = [];
     if (pool.actualFilled <= 0) {
       parts.push(
-        `No Ready nodes with meaningful content yet — target pool is ${pool.targetPool} points.`,
+        t("designFocus.alertEmpty", { pool: pool.targetPool }),
       );
     } else if (pool.underfilled) {
       parts.push(
-        `Target pool not filled: ${pool.actualFilled} / ${pool.targetPool} points (${pool.remaining} remaining).`,
+        t("designFocus.alertUnderfilled", {
+          filled: pool.actualFilled,
+          pool: pool.targetPool,
+          remaining: pool.remaining,
+        }),
       );
     } else if (pool.overfilled) {
       parts.push(
-        `Target pool exceeded: ${pool.actualFilled} / ${pool.targetPool} points.`,
+        t("designFocus.alertOverfilled", {
+          filled: pool.actualFilled,
+          pool: pool.targetPool,
+        }),
       );
     }
     if (pool.distributionWarning) {
       parts.push(
-        `Distribution is off (${pool.redCount} red, ${pool.orangeCount} orange) vs Design Focus targets.`,
+        t("designFocus.alertDistribution", {
+          red: pool.redCount,
+          orange: pool.orangeCount,
+        }),
       );
     }
     return parts.join(" ");
@@ -561,23 +591,18 @@ export function DesignFocusProgressDashboard({
             onClick={() => router.push(parentHref)}
             className="mb-2 text-xs font-medium text-muted hover:text-foreground"
           >
-            ← Up
+            {t("designFocus.up")}
           </button>
         ) : null}
         <p className="text-xs uppercase tracking-wide text-muted">
           {projectName}
           {trail.length > 0
-            ? ` / ${trail.map((t) => t.name).join(" / ")}`
+            ? ` / ${trail.map((crumb) => crumb.name).join(" / ")}`
             : ""}
         </p>
-        <h1 className="font-display text-3xl">Design Focus</h1>
+        <h1 className="font-display text-3xl">{t("designFocus.title")}</h1>
         <p className="mt-2 max-w-prose text-sm text-muted">
-          Target importance forms a points pool. Only{" "}
-          <span className="text-foreground/80">Ready nodes with content</span>{" "}
-          (≥{MIN_FILL_CONTENT_CHARS} chars) fill that pool via their
-          classifications; empty Ready/Idea stubs add 0. Colors use existing
-          balance thresholds (≤5 green, ≤10 orange, &gt;10 red) on normalized
-          distribution.
+          {t("designFocus.intro", { minChars: MIN_FILL_CONTENT_CHARS })}
         </p>
         {intentText ? (
           <CollapsibleProjectIntent
@@ -586,12 +611,12 @@ export function DesignFocusProgressDashboard({
           />
         ) : (
           <p className="mt-3 text-xs text-muted">
-            No intent set —{" "}
+            {t("designFocus.noIntent")}{" "}
             <Link
               href={`/projects/${projectId}/profile`}
               className="text-accent underline"
             >
-              add intent in Profile
+              {t("designFocus.addIntentInProfile")}
             </Link>
             .
           </p>
@@ -602,22 +627,21 @@ export function DesignFocusProgressDashboard({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted">
-              Total target pool
+              {t("designFocus.totalTargetPool")}
             </p>
             <p className="mt-1 font-display text-2xl tabular-nums">
               {pool.actualFilled}{" "}
               <span className="text-base text-muted">/ {pool.targetPool}</span>
             </p>
             <p className="mt-1 text-xs text-muted">
-              sum of targetImportance at this level · {pool.fillPercent}% filled
-              by Ready content
+              {t("designFocus.poolMeta", { percent: pool.fillPercent })}
             </p>
           </div>
           <Link
             href={`/projects/${projectId}/profile#design-focus`}
             className="text-xs font-medium text-accent underline"
           >
-            Edit targets
+            {t("designFocus.editTargets")}
           </Link>
         </div>
         <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted-bg">
@@ -649,7 +673,7 @@ export function DesignFocusProgressDashboard({
         </div>
       ) : pool.targetPool > 0 ? (
         <div className="rounded-[var(--radius)] border border-accent/30 bg-accent/10 px-3 py-3 text-sm text-accent">
-          Target pool filled and distribution within thresholds.
+          {t("designFocus.poolOk")}
         </div>
       ) : null}
 
@@ -661,7 +685,7 @@ export function DesignFocusProgressDashboard({
             onChange={(e) => setShowFillSources(e.target.checked)}
             className="rounded border-border"
           />
-          Review fill sources
+          {t("designFocus.reviewFillSources")}
         </label>
         <div className="flex flex-wrap items-center gap-3">
           <ItemsViewToggle />
@@ -669,7 +693,7 @@ export function DesignFocusProgressDashboard({
             href={`/projects/${projectId}/balance`}
             className="text-xs text-muted underline hover:text-foreground"
           >
-            Balance detail
+            {t("designFocus.balanceDetail")}
           </Link>
         </div>
       </div>
@@ -677,12 +701,12 @@ export function DesignFocusProgressDashboard({
       <div>
         {levelRoots.length === 0 ? (
           <div className="rounded-[var(--radius)] border border-dashed border-border px-4 py-6 text-sm text-muted">
-            No Design Focuses yet.{" "}
+            {t("designFocus.noFocuses")}{" "}
             <Link
               href={`/projects/${projectId}/profile#design-focus`}
               className="text-accent underline"
             >
-              Add them in Profile
+              {t("designFocus.addInProfile")}
             </Link>
             .
           </div>

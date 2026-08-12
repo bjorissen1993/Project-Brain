@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Textarea } from "@/components/ui/field";
 import { CopyProfileDialog } from "@/features/chat/copy-profile-dialog";
@@ -17,6 +18,10 @@ import {
 import { useFocusWorkspace } from "./focus-interaction-context";
 import { IconPicker } from "./icon-picker";
 import { StructureBlobDeleteControl } from "./structure-blob-delete-control";
+import {
+  parseStructureView,
+  structureNodeInfoHref,
+} from "./structure-href";
 
 /** Right-click properties modal for a Project Structure blob (Node). */
 export function StructureBlobPropertiesDialog({
@@ -27,6 +32,8 @@ export function StructureBlobPropertiesDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const structureView = parseStructureView(searchParams.get("view"));
   const { projectId, nodes, colorFor, setFocusColor, iconFor, setFocusIcon } =
     useFocusWorkspace();
 
@@ -43,6 +50,7 @@ export function StructureBlobPropertiesDialog({
       node={node}
       projectId={projectId}
       nodes={nodes}
+      structureView={structureView}
       initialColor={colorFor(nodeId)}
       initialIcon={iconFor(nodeId)}
       setFocusColor={setFocusColor}
@@ -61,6 +69,7 @@ function StructureBlobPropertiesForm({
   node,
   projectId,
   nodes,
+  structureView,
   initialColor,
   initialIcon,
   setFocusColor,
@@ -72,6 +81,7 @@ function StructureBlobPropertiesForm({
   node: ProjectNode;
   projectId: string;
   nodes: ProjectNode[];
+  structureView: ReturnType<typeof parseStructureView>;
   initialColor: string;
   initialIcon: IconKey | null;
   setFocusColor: (id: string, color: string | null) => void;
@@ -89,9 +99,23 @@ function StructureBlobPropertiesForm({
   const [copyOpen, setCopyOpen] = useState(false);
   const childCount = nodes.filter((n) => n.parentId === node.id).length;
 
-  return (
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  // Portal to body so backdrop-blur / overflow chrome cannot trap fixed overlays.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-4 sm:items-center"
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] sm:items-center"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -101,7 +125,7 @@ function StructureBlobPropertiesForm({
         role="dialog"
         aria-modal="true"
         aria-labelledby="structure-blob-props-title"
-        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-[var(--radius)] border border-border bg-panel p-5 shadow-xl"
+        className="max-h-[min(90dvh,calc(100dvh-2rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)))] w-full max-w-md overflow-y-auto rounded-[var(--radius)] border border-border bg-panel p-5 shadow-xl"
       >
         <p
           id="structure-blob-props-title"
@@ -183,7 +207,7 @@ function StructureBlobPropertiesForm({
           <FieldError>{error}</FieldError>
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
             <Link
-              href={`/projects/${projectId}/nodes/${node.id}`}
+              href={structureNodeInfoHref(projectId, node.id, structureView)}
               className="text-xs font-medium text-nav hover:text-nav-hover"
             >
               Open node detail
@@ -245,6 +269,7 @@ function StructureBlobPropertiesForm({
           />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

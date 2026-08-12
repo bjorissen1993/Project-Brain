@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
+import { useT } from "@/features/i18n";
 import { exportProjectAction } from "@/features/projects/actions";
 import type { ProjectExportFormat } from "@/features/projects/export-project";
 
@@ -25,6 +26,7 @@ function downloadTextFile(
 
 /** Profile export: download the full recorded project as Markdown or JSON. */
 export function ProjectExportSection({ projectId }: { projectId: string }) {
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [pendingFormat, setPendingFormat] =
@@ -53,12 +55,8 @@ export function ProjectExportSection({ projectId }: { projectId: string }) {
   return (
     <section id="export" className="scroll-mt-8 space-y-3">
       <div>
-        <h2 className="font-display text-xl">Export</h2>
-        <p className="mt-1 text-sm text-muted">
-          Download the whole idea as recorded: intent history, design focus,
-          structure with content, classifications, relations, rules, direction
-          checks, and related notes. Assembled from the database — no AI call.
-        </p>
+        <h2 className="font-display text-xl">{t("profile.export")}</h2>
+        <p className="mt-1 text-sm text-muted">{t("profile.exportDesc")}</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -69,8 +67,8 @@ export function ProjectExportSection({ projectId }: { projectId: string }) {
           onClick={() => runExport("markdown")}
         >
           {pending && pendingFormat === "markdown"
-            ? "Preparing Markdown…"
-            : "Export Markdown"}
+            ? t("profile.preparingMarkdown")
+            : t("profile.exportMarkdown")}
         </Button>
         <Button
           type="button"
@@ -79,8 +77,8 @@ export function ProjectExportSection({ projectId }: { projectId: string }) {
           onClick={() => runExport("json")}
         >
           {pending && pendingFormat === "json"
-            ? "Preparing JSON…"
-            : "Export JSON"}
+            ? t("profile.preparingJson")
+            : t("profile.exportJson")}
         </Button>
       </div>
       <FieldError>{error}</FieldError>

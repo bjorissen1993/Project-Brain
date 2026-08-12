@@ -69,7 +69,7 @@ type FocusWorkspaceValue = {
   hoveredId: string | null;
   hoverSource: FocusHoverSource;
   setHoveredId: (id: string | null, source?: Exclude<FocusHoverSource, null>) => void;
-  /** Soft selection for Focused relation mode / CONNECTIONS sidebar. */
+  /** Soft selection for CONNECTIONS sidebar (Focused curves follow live hover). */
   relationFocusId: string | null;
   setRelationFocusId: (id: string | null) => void;
   relationMode: RelationMode;

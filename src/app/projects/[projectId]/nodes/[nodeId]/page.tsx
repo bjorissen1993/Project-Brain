@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getNodeAnalysisView } from "@/features/analysis/actions";
 import { NodeDetail } from "@/features/nodes/node-detail";
@@ -35,55 +36,57 @@ export default async function NodePage({
   );
 
   return (
-    <NodeDetail
-      projectId={projectId}
-      node={{
-        id: node.id,
-        name: node.name,
-        type: node.type,
-        customTypeLabel: node.customTypeLabel,
-        status: node.status,
-        content: node.content,
-        summary: node.summary,
-        parentId: node.parentId,
-        designFocusId: node.designFocusId,
-        gamePhase: node.gamePhase,
-        childCount: node.children.length,
-      }}
-      designFocusOptions={project.designFocuses.map((f) => ({
-        id: f.id,
-        name: f.name,
-      }))}
-      allNodes={project.nodes.map((n) => ({
-        id: n.id,
-        name: n.name,
-        parentId: n.parentId ?? null,
-      }))}
-      outgoing={node.sourceRelations.map((rel) => ({
-        id: rel.id,
-        type: rel.type,
-        label: rel.label,
-        other: rel.targetNode,
-      }))}
-      incoming={node.targetRelations.map((rel) => ({
-        id: rel.id,
-        type: rel.type,
-        label: rel.label,
-        other: rel.sourceNode,
-      }))}
-      analysis={analysis}
-      childNodes={node.children.map((c) => ({
-        id: c.id,
-        name: c.name,
-        type: c.type,
-        status: c.status,
-      }))}
-      classifications={classifications.map((c) => ({
-        id: c.id,
-        category: focusNameById.get(c.category) ?? c.category,
-        confidence: c.confidence,
-        source: c.source,
-      }))}
-    />
+    <Suspense fallback={<div className="px-6 py-8 text-sm text-muted">Loading…</div>}>
+      <NodeDetail
+        projectId={projectId}
+        node={{
+          id: node.id,
+          name: node.name,
+          type: node.type,
+          customTypeLabel: node.customTypeLabel,
+          status: node.status,
+          content: node.content,
+          summary: node.summary,
+          parentId: node.parentId,
+          designFocusId: node.designFocusId,
+          gamePhase: node.gamePhase,
+          childCount: node.children.length,
+        }}
+        designFocusOptions={project.designFocuses.map((f) => ({
+          id: f.id,
+          name: f.name,
+        }))}
+        allNodes={project.nodes.map((n) => ({
+          id: n.id,
+          name: n.name,
+          parentId: n.parentId ?? null,
+        }))}
+        outgoing={node.sourceRelations.map((rel) => ({
+          id: rel.id,
+          type: rel.type,
+          label: rel.label,
+          other: rel.targetNode,
+        }))}
+        incoming={node.targetRelations.map((rel) => ({
+          id: rel.id,
+          type: rel.type,
+          label: rel.label,
+          other: rel.sourceNode,
+        }))}
+        analysis={analysis}
+        childNodes={node.children.map((c) => ({
+          id: c.id,
+          name: c.name,
+          type: c.type,
+          status: c.status,
+        }))}
+        classifications={classifications.map((c) => ({
+          id: c.id,
+          category: focusNameById.get(c.category) ?? c.category,
+          confidence: c.confidence,
+          source: c.source,
+        }))}
+      />
+    </Suspense>
   );
 }

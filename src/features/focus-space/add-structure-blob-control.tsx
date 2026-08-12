@@ -1,7 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import { createPortal } from "react-dom";
 import { FileText, ImageIcon, Plus, SquareStack } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Textarea } from "@/components/ui/field";
@@ -73,15 +82,6 @@ export function AddStructureBlobControl({
     setError(null);
   };
 
-  const title =
-    step === "note"
-      ? "New note"
-      : step === "node"
-        ? "New node"
-        : step === "image"
-          ? "Add image"
-          : "Add to this level";
-
   return (
     <div className={cn("relative", className)}>
       <button
@@ -141,239 +141,338 @@ export function AddStructureBlobControl({
       />
 
       {step ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-4 sm:items-center"
-          role="presentation"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) close();
+        <AddStructureBlobModal
+          projectId={projectId}
+          parentNodeId={parentNodeId}
+          step={step}
+          setStep={setStep}
+          name={name}
+          setName={setName}
+          description={description}
+          setDescription={setDescription}
+          asFolder={asFolder}
+          setAsFolder={setAsFolder}
+          color={color}
+          setColor={setColor}
+          icon={icon}
+          setIcon={setIcon}
+          error={error}
+          setError={setError}
+          pending={pending}
+          startTransition={startTransition}
+          fileRef={fileRef}
+          onClose={close}
+          onCreated={(id, nextColor, nextIcon) => {
+            workspace?.setFocusColor(id, nextColor);
+            if (nextIcon) workspace?.setFocusIcon(id, nextIcon);
+            close();
+            router.refresh();
           }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="add-structure-blob-title"
-            className="w-full max-w-md rounded-[var(--radius)] border border-border bg-panel p-5 shadow-xl"
-          >
-            <p
-              id="add-structure-blob-title"
-              className="font-display text-lg font-semibold"
-            >
-              {title}
-            </p>
-
-            {step === "chooser" ? (
-              <>
-                <p className="mt-1 text-xs text-muted">
-                  Choose what to add at this Structure level.
-                </p>
-                <div className="mt-4 grid gap-2">
-                  <button
-                    type="button"
-                    className="flex items-start gap-3 rounded-[var(--radius)] border border-border bg-panel-elevated/40 px-3 py-3 text-left transition-colors hover:border-nav/45 hover:bg-nav-muted/40"
-                    onClick={() => setStep("node")}
-                  >
-                    <SquareStack
-                      className="mt-0.5 shrink-0 text-nav"
-                      size={18}
-                      aria-hidden
-                    />
-                    <span>
-                      <span className="block text-sm font-medium">Node</span>
-                      <span className="mt-0.5 block text-xs text-muted">
-                        Folder or structural section for organizing the tree.
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-start gap-3 rounded-[var(--radius)] border border-border bg-panel-elevated/40 px-3 py-3 text-left transition-colors hover:border-nav/45 hover:bg-nav-muted/40"
-                    onClick={() => {
-                      setAsFolder(false);
-                      setStep("note");
-                    }}
-                  >
-                    <FileText
-                      className="mt-0.5 shrink-0 text-nav"
-                      size={18}
-                      aria-hidden
-                    />
-                    <span>
-                      <span className="block text-sm font-medium">Note</span>
-                      <span className="mt-0.5 block text-xs text-muted">
-                        Content idea with written notes at this level.
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-start gap-3 rounded-[var(--radius)] border border-border bg-panel-elevated/40 px-3 py-3 text-left transition-colors hover:border-nav/45 hover:bg-nav-muted/40"
-                    onClick={() => {
-                      setStep("image");
-                      window.setTimeout(() => fileRef.current?.click(), 0);
-                    }}
-                  >
-                    <ImageIcon
-                      className="mt-0.5 shrink-0 text-nav"
-                      size={18}
-                      aria-hidden
-                    />
-                    <span>
-                      <span className="block text-sm font-medium">Image</span>
-                      <span className="mt-0.5 block text-xs text-muted">
-                        Appears as a resizable blob on the Focus Space canvas.
-                      </span>
-                    </span>
-                  </button>
-                </div>
-                <div className="mt-4 flex justify-end">
-                  <Button type="button" variant="ghost" onClick={close}>
-                    Cancel
-                  </Button>
-                </div>
-              </>
-            ) : step === "image" ? (
-              <>
-                <p className="mt-1 text-xs text-muted">
-                  {pending
-                    ? "Uploading image…"
-                    : "Pick an image file, or cancel and choose again."}
-                </p>
-                <FieldError>{error}</FieldError>
-                <div className="mt-4 flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setStep("chooser")}
-                    disabled={pending}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => fileRef.current?.click()}
-                  >
-                    {pending ? "Uploading…" : "Choose file"}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="mt-1 text-xs text-muted">
-                  {step === "note"
-                    ? "Adds a content note as a blob at this level."
-                    : "Adds a structural node. Folders organize children; ideas hold content."}
-                </p>
-                <form
-                  className="mt-4 space-y-3"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    setError(null);
-                    startTransition(async () => {
-                      const result = await createNodeAction({
-                        projectId,
-                        name: name.trim(),
-                        parentId: parentNodeId,
-                        type:
-                          step === "note"
-                            ? "IDEA"
-                            : asFolder
-                              ? "FOLDER"
-                              : "IDEA",
-                        status: "IDEA",
-                        content: description.trim() || null,
-                      });
-                      if (!result.ok) {
-                        setError(result.error);
-                        return;
-                      }
-                      workspace?.setFocusColor(result.node.id, color);
-                      if (icon) workspace?.setFocusIcon(result.node.id, icon);
-                      close();
-                      router.refresh();
-                    });
-                  }}
-                >
-                  <div>
-                    <Label htmlFor="structure-blob-name">Name</Label>
-                    <Input
-                      id="structure-blob-name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder={
-                        step === "note"
-                          ? "e.g. Core loop sketch"
-                          : parentNodeId == null
-                            ? "e.g. Mechanics"
-                            : "e.g. Resource Systems"
-                      }
-                      required
-                      autoFocus
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="structure-blob-desc">
-                      {step === "note" ? "Notes" : "Idea / notes (optional)"}
-                    </Label>
-                    <Textarea
-                      id="structure-blob-desc"
-                      rows={3}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder={
-                        step === "note"
-                          ? "What is this note about?"
-                          : "Optional starting notes for this node"
-                      }
-                    />
-                  </div>
-                  {step === "node" ? (
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={asFolder}
-                        onChange={(e) => setAsFolder(e.target.checked)}
-                      />
-                      <span>
-                        Folder / area container
-                        {parentNodeId == null ? " (recommended at root)" : ""}
-                      </span>
-                    </label>
-                  ) : null}
-                  <div>
-                    <Label htmlFor="structure-blob-color">Blob color</Label>
-                    <input
-                      id="structure-blob-color"
-                      type="color"
-                      value={color}
-                      onChange={(e) => setColor(e.target.value)}
-                      className="mt-1 h-9 w-full cursor-pointer rounded border border-border bg-transparent"
-                    />
-                  </div>
-                  <IconPicker
-                    id="structure-blob-icon"
-                    value={icon}
-                    onChange={setIcon}
-                  />
-                  <FieldError>{error}</FieldError>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setStep("chooser")}
-                    >
-                      Back
-                    </Button>
-                    <Button type="submit" disabled={pending || !name.trim()}>
-                      {pending ? "Creating…" : "Create"}
-                    </Button>
-                  </div>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
+        />
       ) : null}
     </div>
+  );
+}
+
+function AddStructureBlobModal({
+  projectId,
+  parentNodeId,
+  step,
+  setStep,
+  name,
+  setName,
+  description,
+  setDescription,
+  asFolder,
+  setAsFolder,
+  color,
+  setColor,
+  icon,
+  setIcon,
+  error,
+  setError,
+  pending,
+  startTransition,
+  fileRef,
+  onClose,
+  onCreated,
+}: {
+  projectId: string;
+  parentNodeId: string | null;
+  step: CreateKind;
+  setStep: Dispatch<SetStateAction<CreateKind | null>>;
+  name: string;
+  setName: (value: string) => void;
+  description: string;
+  setDescription: (value: string) => void;
+  asFolder: boolean;
+  setAsFolder: (value: boolean) => void;
+  color: string;
+  setColor: (value: string) => void;
+  icon: IconKey | null;
+  setIcon: (value: IconKey | null) => void;
+  error: string | null;
+  setError: (value: string | null) => void;
+  pending: boolean;
+  startTransition: (fn: () => void) => void;
+  fileRef: RefObject<HTMLInputElement | null>;
+  onClose: () => void;
+  onCreated: (id: string, color: string, icon: IconKey | null) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  const title =
+    step === "note"
+      ? "New note"
+      : step === "node"
+        ? "New node"
+        : step === "image"
+          ? "Add image"
+          : "Add to this level";
+
+  // Portal to body: the Structure header uses backdrop-blur, which creates a
+  // containing block and traps position:fixed to that chrome strip.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] sm:items-center"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-structure-blob-title"
+        className="max-h-[min(90dvh,calc(100dvh-2rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)))] w-full max-w-md overflow-y-auto rounded-[var(--radius)] border border-border bg-panel p-5 shadow-xl"
+      >
+        <p
+          id="add-structure-blob-title"
+          className="font-display text-lg font-semibold"
+        >
+          {title}
+        </p>
+
+        {step === "chooser" ? (
+          <>
+            <p className="mt-1 text-xs text-muted">
+              Choose what to add at this Structure level.
+            </p>
+            <div className="mt-4 grid gap-2">
+              <button
+                type="button"
+                className="flex items-start gap-3 rounded-[var(--radius)] border border-border bg-panel-elevated/40 px-3 py-3 text-left transition-colors hover:border-nav/45 hover:bg-nav-muted/40"
+                onClick={() => setStep("node")}
+              >
+                <SquareStack
+                  className="mt-0.5 shrink-0 text-nav"
+                  size={18}
+                  aria-hidden
+                />
+                <span>
+                  <span className="block text-sm font-medium">Node</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Folder or structural section for organizing the tree.
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="flex items-start gap-3 rounded-[var(--radius)] border border-border bg-panel-elevated/40 px-3 py-3 text-left transition-colors hover:border-nav/45 hover:bg-nav-muted/40"
+                onClick={() => {
+                  setAsFolder(false);
+                  setStep("note");
+                }}
+              >
+                <FileText
+                  className="mt-0.5 shrink-0 text-nav"
+                  size={18}
+                  aria-hidden
+                />
+                <span>
+                  <span className="block text-sm font-medium">Note</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Content idea with written notes at this level.
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="flex items-start gap-3 rounded-[var(--radius)] border border-border bg-panel-elevated/40 px-3 py-3 text-left transition-colors hover:border-nav/45 hover:bg-nav-muted/40"
+                onClick={() => {
+                  setStep("image");
+                  window.setTimeout(() => fileRef.current?.click(), 0);
+                }}
+              >
+                <ImageIcon
+                  className="mt-0.5 shrink-0 text-nav"
+                  size={18}
+                  aria-hidden
+                />
+                <span>
+                  <span className="block text-sm font-medium">Image</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Appears as a resizable blob on the Focus Space canvas.
+                  </span>
+                </span>
+              </button>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button type="button" variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+            </div>
+          </>
+        ) : step === "image" ? (
+          <>
+            <p className="mt-1 text-xs text-muted">
+              {pending
+                ? "Uploading image…"
+                : "Pick an image file, or cancel and choose again."}
+            </p>
+            <FieldError>{error}</FieldError>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setStep("chooser")}
+                disabled={pending}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                disabled={pending}
+                onClick={() => fileRef.current?.click()}
+              >
+                {pending ? "Uploading…" : "Choose file"}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-muted">
+              {step === "note"
+                ? "Adds a content note as a blob at this level."
+                : "Adds a structural node. Folders organize children; ideas hold content."}
+            </p>
+            <form
+              className="mt-4 space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setError(null);
+                startTransition(async () => {
+                  const result = await createNodeAction({
+                    projectId,
+                    name: name.trim(),
+                    parentId: parentNodeId,
+                    type:
+                      step === "note"
+                        ? "IDEA"
+                        : asFolder
+                          ? "FOLDER"
+                          : "IDEA",
+                    status: "IDEA",
+                    content: description.trim() || null,
+                  });
+                  if (!result.ok) {
+                    setError(result.error);
+                    return;
+                  }
+                  onCreated(result.node.id, color, icon);
+                });
+              }}
+            >
+              <div>
+                <Label htmlFor="structure-blob-name">Name</Label>
+                <Input
+                  id="structure-blob-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={
+                    step === "note"
+                      ? "e.g. Core loop sketch"
+                      : parentNodeId == null
+                        ? "e.g. Mechanics"
+                        : "e.g. Resource Systems"
+                  }
+                  required
+                  autoFocus
+                />
+              </div>
+              <div>
+                <Label htmlFor="structure-blob-desc">
+                  {step === "note" ? "Notes" : "Idea / notes (optional)"}
+                </Label>
+                <Textarea
+                  id="structure-blob-desc"
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={
+                    step === "note"
+                      ? "What is this note about?"
+                      : "Optional starting notes for this node"
+                  }
+                />
+              </div>
+              {step === "node" ? (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={asFolder}
+                    onChange={(e) => setAsFolder(e.target.checked)}
+                  />
+                  <span>
+                    Folder / area container
+                    {parentNodeId == null ? " (recommended at root)" : ""}
+                  </span>
+                </label>
+              ) : null}
+              <div>
+                <Label htmlFor="structure-blob-color">Blob color</Label>
+                <input
+                  id="structure-blob-color"
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="mt-1 h-9 w-full cursor-pointer rounded border border-border bg-transparent"
+                />
+              </div>
+              <IconPicker
+                id="structure-blob-icon"
+                value={icon}
+                onChange={setIcon}
+              />
+              <FieldError>{error}</FieldError>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setStep("chooser")}
+                >
+                  Back
+                </Button>
+                <Button type="submit" disabled={pending || !name.trim()}>
+                  {pending ? "Creating…" : "Create"}
+                </Button>
+              </div>
+            </form>
+          </>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }

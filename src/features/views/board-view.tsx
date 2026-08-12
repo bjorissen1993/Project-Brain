@@ -9,7 +9,10 @@ import {
   useTransition,
   type DragEvent,
 } from "react";
+import { ContextMenu } from "@/components/ui/context-menu";
 import { updateNodeAction } from "@/features/nodes/actions";
+import { boardNodeMenuItems } from "@/features/focus-space/structure-context-menu";
+import { useT } from "@/features/i18n";
 import { NODE_STATUS_OPTIONS, type NodeStatus } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +21,8 @@ type BoardNode = {
   name: string;
   type: string;
   status: NodeStatus;
+  /** Breadcrumb of parent folders, e.g. "Characters / Berwynn". */
+  parentPath: string;
 };
 
 const COLUMNS = NODE_STATUS_OPTIONS;
@@ -30,6 +35,7 @@ export function BoardView({
   projectId: string;
   nodes: BoardNode[];
 }) {
+  const t = useT();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [optimisticNodes, setOptimisticStatus] = useOptimistic(
@@ -39,6 +45,11 @@ export function BoardView({
   );
   const [dragOverStatus, setDragOverStatus] = useState<NodeStatus | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{
+    nodeId: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const suppressClickRef = useRef(false);
   const draggingIdRef = useRef<string | null>(null);
 
@@ -108,16 +119,15 @@ export function BoardView({
   }
 
   return (
-    <div className="space-y-4 px-4 py-8 lg:px-6">
-      <div className="mx-auto w-full max-w-[1600px]">
-        <h1 className="font-display text-3xl">Board</h1>
+    <div className="flex h-full min-h-0 flex-col gap-3 px-3 py-4 sm:px-4 sm:py-5 lg:px-6">
+      <div className="mx-auto w-full max-w-[1600px] shrink-0">
+        <h1 className="font-display text-2xl sm:text-3xl">{t("board.title")}</h1>
         <p className="mt-2 max-w-prose text-sm text-muted">
-          Columns by status. Drag cards into the column they belong in — no
-          silent AI moves.
+          {t("board.intro")}
         </p>
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1600px] gap-3 overflow-x-auto pb-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 gap-3 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
         {COLUMNS.map((col) => {
           const cards = byStatus(col.value);
           const isDropTarget = dragOverStatus === col.value && draggingId != null;
@@ -135,48 +145,68 @@ export function BoardView({
               }}
               onDrop={(event) => onColumnDrop(event, col.value)}
               className={cn(
-                "flex w-64 shrink-0 flex-col rounded-[var(--radius)] border bg-panel transition-colors",
+                "flex h-full min-h-0 min-w-[13.5rem] flex-1 basis-0 flex-col overflow-hidden rounded-[var(--radius)] border bg-panel transition-colors",
                 isDropTarget
                   ? "border-accent bg-accent-muted"
                   : "border-border",
               )}
             >
-              <div className="border-b border-border px-3 py-2">
+              <div className="shrink-0 border-b border-border px-3 py-2.5">
                 <p className="text-xs font-semibold uppercase tracking-wide">
                   {col.label}
                 </p>
                 <p className="text-[10px] text-muted">{cards.length}</p>
               </div>
-              <ul className="flex flex-1 flex-col gap-2 p-2">
-                {cards.map((n) => (
-                  <li
-                    key={n.id}
-                    draggable
-                    onDragStart={(event) => onCardDragStart(event, n)}
-                    onDragEnd={onCardDragEnd}
-                    className={cn(
-                      "cursor-grab rounded-[var(--radius)] border border-border bg-panel-elevated px-2.5 py-2 active:cursor-grabbing",
-                      draggingId === n.id && "opacity-50",
-                    )}
-                  >
-                    <Link
-                      href={`/projects/${projectId}/nodes/${n.id}`}
-                      draggable={false}
-                      onClick={(event) => {
-                        if (suppressClickRef.current) {
-                          event.preventDefault();
-                          suppressClickRef.current = false;
-                        }
+              <ul className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-2.5">
+                {cards.map((n) => {
+                  const path =
+                    n.parentPath.trim().length > 0
+                      ? n.parentPath
+                      : t("board.projectRoot");
+                  return (
+                    <li
+                      key={n.id}
+                      draggable
+                      onDragStart={(event) => onCardDragStart(event, n)}
+                      onDragEnd={onCardDragEnd}
+                      onContextMenu={(event) => {
+                        event.preventDefault();
+                        setMenu({
+                          nodeId: n.id,
+                          x: event.clientX,
+                          y: event.clientY,
+                        });
                       }}
-                      className="text-sm font-semibold hover:text-accent"
+                      className={cn(
+                        "flex min-h-[8.75rem] cursor-grab flex-col rounded-[var(--radius)] border border-border bg-panel-elevated px-3.5 py-3.5 active:cursor-grabbing",
+                        draggingId === n.id && "opacity-50",
+                      )}
                     >
-                      {n.name}
-                    </Link>
-                    <p className="mt-0.5 text-[10px] uppercase text-muted">
-                      {n.type}
-                    </p>
-                  </li>
-                ))}
+                      <p
+                        className="line-clamp-2 min-h-[2.25rem] text-[11px] leading-snug text-muted"
+                        title={path}
+                      >
+                        {path}
+                      </p>
+                      <Link
+                        href={`/projects/${projectId}/nodes/${n.id}`}
+                        draggable={false}
+                        onClick={(event) => {
+                          if (suppressClickRef.current) {
+                            event.preventDefault();
+                            suppressClickRef.current = false;
+                          }
+                        }}
+                        className="mt-2 block text-base font-semibold leading-snug hover:text-accent"
+                      >
+                        {n.name}
+                      </Link>
+                      <p className="mt-auto pt-3 text-[11px] uppercase tracking-wide text-muted">
+                        {n.type}
+                      </p>
+                    </li>
+                  );
+                })}
                 {!cards.length ? (
                   <li className="pointer-events-none px-2 py-6 text-center text-xs text-muted">
                     Empty
@@ -187,6 +217,21 @@ export function BoardView({
           );
         })}
       </div>
+
+      {menu ? (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={boardNodeMenuItems()}
+          onSelect={(action) => {
+            const href = `/projects/${projectId}/nodes/${menu.nodeId}`;
+            if (action === "open" || action === "info") {
+              router.push(href);
+            }
+          }}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
     </div>
   );
 }

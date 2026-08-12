@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Select, Textarea } from "@/components/ui/field";
@@ -187,139 +188,223 @@ export function CombineNotesControl({
       )}
 
       {draftOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-4 sm:items-center"
-          role="presentation"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setDraftOpen(false);
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="combine-notes-title"
-            className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-[var(--radius)] border border-border bg-panel p-5 shadow-xl"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p
-                  id="combine-notes-title"
-                  className="font-display text-lg font-semibold"
-                >
-                  Combined story
-                </p>
-                <p className="mt-1 text-xs text-muted">
-                  Review before saving. Accept is required — nothing is written
-                  until then.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 w-8 p-0"
-                onClick={() => setDraftOpen(false)}
-                aria-label="Close"
-              >
-                <X size={18} />
-              </Button>
-            </div>
-
-            {message ? (
-              <p className="mt-3 text-xs text-muted">{message}</p>
-            ) : null}
-
-            <div className="mt-4 space-y-3">
-              <div>
-                <Label htmlFor="combine-title">Title</Label>
-                <Input
-                  id="combine-title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="combine-summary">Story / summary</Label>
-                <Textarea
-                  id="combine-summary"
-                  rows={10}
-                  value={summary}
-                  onChange={(e) => setSummary(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="combine-target">Save as</Label>
-                <Select
-                  id="combine-target"
-                  value={targetNodeId}
-                  onChange={(e) => setTargetNodeId(e.target.value)}
-                >
-                  <option value="">New note at this level</option>
-                  {noteCandidates
-                    .filter((n) => activeSelected.includes(n.id))
-                    .map((n) => (
-                      <option key={n.id} value={n.id}>
-                        Update “{n.name}”
-                      </option>
-                    ))}
-                </Select>
-              </div>
-              <label className="flex cursor-pointer items-start gap-2 text-xs text-foreground">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 accent-[var(--accent)]"
-                  checked={removeSourceNotes}
-                  onChange={(e) => setRemoveSourceNotes(e.target.checked)}
-                />
-                <span>
-                  Also remove original notes after Accept
-                  <span className="block text-[11px] text-muted">
-                    Off by default. The update target is kept if you chose one.
-                  </span>
-                </span>
-              </label>
-              <FieldError>{error}</FieldError>
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setDraftOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  disabled={pending || !title.trim() || !summary.trim()}
-                  onClick={() => {
-                    setError(null);
-                    startTransition(async () => {
-                      const result = await acceptCombinedNoteAction({
-                        projectId,
-                        parentNodeId,
-                        sourceNodeIds: activeSelected,
-                        title: title.trim(),
-                        summary: summary.trim(),
-                        targetNodeId: targetNodeId || null,
-                        removeSourceNotes,
-                      });
-                      if (!result.ok) {
-                        setError(result.error);
-                        return;
-                      }
-                      setDraftOpen(false);
-                      setSelecting(false);
-                      setSelected([]);
-                      router.refresh();
-                    });
-                  }}
-                >
-                  {pending ? "Saving…" : "Accept"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CombineNotesDraftModal
+          title={title}
+          setTitle={setTitle}
+          summary={summary}
+          setSummary={setSummary}
+          targetNodeId={targetNodeId}
+          setTargetNodeId={setTargetNodeId}
+          removeSourceNotes={removeSourceNotes}
+          setRemoveSourceNotes={setRemoveSourceNotes}
+          noteCandidates={noteCandidates}
+          activeSelected={activeSelected}
+          message={message}
+          error={error}
+          setError={setError}
+          pending={pending}
+          startTransition={startTransition}
+          projectId={projectId}
+          parentNodeId={parentNodeId}
+          setDraftOpen={setDraftOpen}
+          setSelecting={setSelecting}
+          setSelected={setSelected}
+          router={router}
+        />
       ) : null}
     </div>
+  );
+}
+
+function CombineNotesDraftModal({
+  title,
+  setTitle,
+  summary,
+  setSummary,
+  targetNodeId,
+  setTargetNodeId,
+  removeSourceNotes,
+  setRemoveSourceNotes,
+  noteCandidates,
+  activeSelected,
+  message,
+  error,
+  setError,
+  pending,
+  startTransition,
+  projectId,
+  parentNodeId,
+  setDraftOpen,
+  setSelecting,
+  setSelected,
+  router,
+}: {
+  title: string;
+  setTitle: (value: string) => void;
+  summary: string;
+  setSummary: (value: string) => void;
+  targetNodeId: string;
+  setTargetNodeId: (value: string) => void;
+  removeSourceNotes: boolean;
+  setRemoveSourceNotes: (value: boolean) => void;
+  noteCandidates: { id: string; name: string }[];
+  activeSelected: string[];
+  message: string | null;
+  error: string | null;
+  setError: (value: string | null) => void;
+  pending: boolean;
+  startTransition: (fn: () => void) => void;
+  projectId: string;
+  parentNodeId: string | null;
+  setDraftOpen: (value: boolean) => void;
+  setSelecting: (value: boolean) => void;
+  setSelected: (ids: string[]) => void;
+  router: { refresh: () => void };
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDraftOpen(false);
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [setDraftOpen]);
+
+  const onClose = () => setDraftOpen(false);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] sm:items-center"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="combine-notes-title"
+        className="max-h-[min(90dvh,calc(100dvh-2rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)))] w-full max-w-lg overflow-y-auto rounded-[var(--radius)] border border-border bg-panel p-5 shadow-xl"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p
+              id="combine-notes-title"
+              className="font-display text-lg font-semibold"
+            >
+              Combined story
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Review before saving. Accept is required — nothing is written
+              until then.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-8 w-8 p-0"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={18} />
+          </Button>
+        </div>
+
+        {message ? (
+          <p className="mt-3 text-xs text-muted">{message}</p>
+        ) : null}
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <Label htmlFor="combine-title">Title</Label>
+            <Input
+              id="combine-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="combine-summary">Story / summary</Label>
+            <Textarea
+              id="combine-summary"
+              rows={10}
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="combine-target">Save as</Label>
+            <Select
+              id="combine-target"
+              value={targetNodeId}
+              onChange={(e) => setTargetNodeId(e.target.value)}
+            >
+              <option value="">New note at this level</option>
+              {noteCandidates
+                .filter((n) => activeSelected.includes(n.id))
+                .map((n) => (
+                  <option key={n.id} value={n.id}>
+                    Update “{n.name}”
+                  </option>
+                ))}
+            </Select>
+          </div>
+          <label className="flex cursor-pointer items-start gap-2 text-xs text-foreground">
+            <input
+              type="checkbox"
+              className="mt-0.5 accent-[var(--accent)]"
+              checked={removeSourceNotes}
+              onChange={(e) => setRemoveSourceNotes(e.target.checked)}
+            />
+            <span>
+              Also remove original notes after Accept
+              <span className="block text-[11px] text-muted">
+                Off by default. The update target is kept if you chose one.
+              </span>
+            </span>
+          </label>
+          <FieldError>{error}</FieldError>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={pending || !title.trim() || !summary.trim()}
+              onClick={() => {
+                setError(null);
+                startTransition(async () => {
+                  const result = await acceptCombinedNoteAction({
+                    projectId,
+                    parentNodeId,
+                    sourceNodeIds: activeSelected,
+                    title: title.trim(),
+                    summary: summary.trim(),
+                    targetNodeId: targetNodeId || null,
+                    removeSourceNotes,
+                  });
+                  if (!result.ok) {
+                    setError(result.error);
+                    return;
+                  }
+                  setDraftOpen(false);
+                  setSelecting(false);
+                  setSelected([]);
+                  router.refresh();
+                });
+              }}
+            >
+              {pending ? "Saving…" : "Accept"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

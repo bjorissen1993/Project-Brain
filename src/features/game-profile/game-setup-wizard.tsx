@@ -14,7 +14,6 @@ import {
   GENRE_TEMPLATES,
   getGenreProjectAreas,
   getGenreTemplate,
-  IMPORTANCE_SLIDER_FALLBACK,
 } from "@/features/game-profile/genre-templates";
 import type {
   SetupSuggestionData,
@@ -26,6 +25,7 @@ import {
   loadFocusColorOverrides,
   saveFocusColorOverrides,
 } from "@/features/focus-space/focus-blob-color";
+import { useLocale, useT } from "@/features/i18n";
 import {
   iconKeyForGenre,
   iconKeyForName,
@@ -51,9 +51,6 @@ type AreaSelection = {
   isCustom: boolean;
   reasoning?: string;
 };
-
-const INTENT_PLACEHOLDER = `Example:
-Players should feel the quiet satisfaction of restoring a neglected village — tending gardens, repairing homes, and rebuilding community trust. The core fantasy is gentle progress and belonging, not conquest. We optimize for cozy daily loops, relationships, and soft seasonal goals. Avoid combat pressure, timer stress, and punitive failure.`;
 
 function flattenTemplateFocuses(templateKey: string): FocusSelection[] {
   const template = getGenreTemplate(templateKey);
@@ -114,6 +111,8 @@ export function GameSetupWizard({
   projectId: string;
   projectName: string;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [primaryGenreKey, setPrimaryGenreKey] = useState<string>("");
@@ -212,11 +211,11 @@ export function GameSetupWizard({
   );
 
   const steps = [
-    "Intent",
-    "Genres",
-    "Project Areas",
-    "Design Focus",
-    "Review",
+    t("wizard.stepIntent"),
+    t("wizard.stepGenres"),
+    t("wizard.stepAreas"),
+    t("wizard.stepFocus"),
+    t("wizard.stepReview"),
   ];
 
   function clearSuggestionState() {
@@ -416,7 +415,7 @@ export function GameSetupWizard({
   function generateAndContinue() {
     setError(null);
     if (!intent.trim()) {
-      setError("Describe the experience you want to create first.");
+      setError(t("wizard.needIntentGame"));
       return;
     }
 
@@ -424,6 +423,7 @@ export function GameSetupWizard({
       const result = await suggestSetupFromIntentAction({
         projectId,
         intentText: intent,
+        locale,
       });
       if (!result.ok) {
         setError(result.error);
@@ -505,13 +505,16 @@ export function GameSetupWizard({
   }
 
   const suggestionLabel =
-    suggestionMeta?.source === "ai" ? "AI suggestions" : "Heuristic suggestions";
+    suggestionMeta?.source === "ai"
+      ? t("wizard.aiSuggestions")
+      : t("wizard.heuristicSuggestions");
+  const typeLabel = t("landing.typeGame");
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
-          {projectName} · Game configuration
+          {t("wizard.configEyebrow", { name: projectName, type: typeLabel })}
         </p>
         <Button
           type="button"
@@ -520,14 +523,12 @@ export function GameSetupWizard({
           onClick={() => setLeaveOpen(true)}
           className="text-xs"
         >
-          {cancelling ? "Discarding…" : "Cancel · Back to home"}
+          {cancelling ? t("wizard.discarding") : t("wizard.cancelHome")}
         </Button>
       </div>
-      <h1 className="mt-3 font-display text-3xl">Configure your game project</h1>
+      <h1 className="mt-3 font-display text-3xl">{t("wizard.configureGame")}</h1>
       <p className="mt-2 max-w-prose text-sm text-muted">
-        Intent first, then genres. Project Areas organize where ideas live;
-        Design Focuses define what the game should emphasize. Suggestions are
-        advisory — accept, edit, or reject before anything is saved.
+        {t("wizard.introGame")}
       </p>
 
       <ol className="mt-8 flex flex-wrap gap-2">
@@ -557,30 +558,34 @@ export function GameSetupWizard({
               </p>
               <p className="mt-1 text-muted">{suggestionMeta.message}</p>
               <p className="mt-1 text-xs text-muted">
-                Pre-filled below for edit — nothing is committed until Finish setup.
+                {t("wizard.prefilled")}
               </p>
             </div>
             <Button type="button" variant="ghost" onClick={rejectSuggestions}>
-              Reject suggestions
+              {t("wizard.rejectSuggestions")}
             </Button>
           </div>
           {suggestionMeta.hints ? (
             <div className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2">
               {suggestionMeta.hints.primaryExperiences?.length ? (
                 <p>
-                  <span className="text-foreground">Experiences: </span>
+                  <span className="text-foreground">
+                    {t("wizard.experiences")}{" "}
+                  </span>
                   {suggestionMeta.hints.primaryExperiences.join(" · ")}
                 </p>
               ) : null}
               {suggestionMeta.hints.supportingSystems?.length ? (
                 <p>
-                  <span className="text-foreground">Systems: </span>
+                  <span className="text-foreground">
+                    {t("wizard.systems")}{" "}
+                  </span>
                   {suggestionMeta.hints.supportingSystems.join(" · ")}
                 </p>
               ) : null}
               {suggestionMeta.hints.thingsToAvoid?.length ? (
                 <p className="sm:col-span-2">
-                  <span className="text-foreground">Avoid: </span>
+                  <span className="text-foreground">{t("wizard.avoid")} </span>
                   {suggestionMeta.hints.thingsToAvoid.join(" · ")}
                 </p>
               ) : null}
@@ -592,18 +597,16 @@ export function GameSetupWizard({
       <div className="mt-8 space-y-6">
         {step === 0 ? (
           <div className="max-w-3xl">
-            <Label htmlFor="intent">Project intent</Label>
+            <Label htmlFor="intent">{t("wizard.projectIntent")}</Label>
             <p className="mb-2 max-w-prose text-sm text-muted">
-              Tell the story of what this project should become — the foundation.
-              Your wording is the source of truth. We&apos;ll suggest genres,
-              Project Areas, and Design Focus sliders from it; you decide what to keep.
+              {t("wizard.intentHelpGame")}
             </p>
             <Textarea
               id="intent"
               rows={12}
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              placeholder={INTENT_PLACEHOLDER}
+              placeholder={t("wizard.intentPlaceholderGame")}
               className="min-h-[280px] leading-relaxed"
             />
           </div>
@@ -612,7 +615,7 @@ export function GameSetupWizard({
         {step === 1 ? (
           <>
             <div>
-              <Label>Primary genre</Label>
+              <Label>{t("wizard.primaryGenre")}</Label>
               <p className="mb-2 max-w-prose text-sm text-muted">
                 Suggested from your intent — change freely. Genres suggest both
                 Project Areas and Design Focuses on later steps (separately).
@@ -650,7 +653,7 @@ export function GameSetupWizard({
                       </div>
                       {suggestionMeta && primaryGenreKey === genre.key ? (
                         <span className="shrink-0 text-[10px] uppercase tracking-wide text-nav">
-                          Suggested
+                          {t("wizard.suggested")}
                         </span>
                       ) : null}
                     </div>
@@ -661,7 +664,7 @@ export function GameSetupWizard({
             </div>
 
             <div>
-              <Label>Secondary genres / influences</Label>
+              <Label>{t("wizard.secondaryGenres")}</Label>
               <p className="mb-2 text-sm text-muted">
                 Subgenres and cross-influences. Their Project Areas and Design
                 Focuses appear on the next steps as separate suggestions.
@@ -698,7 +701,7 @@ export function GameSetupWizard({
                         {genre.name}
                         {suggested ? (
                           <span className="ml-0.5 text-[10px] uppercase opacity-80">
-                            · suggested
+                            {t("wizard.suggestedSuffix")}
                           </span>
                         ) : null}
                       </button>
@@ -711,12 +714,12 @@ export function GameSetupWizard({
             {(primaryGenreKey === "custom" ||
               secondaryGenreKeys.includes("custom")) && (
               <div>
-                <Label htmlFor="customGameType">Custom game type</Label>
+                <Label htmlFor="customGameType">{t("wizard.customGameType")}</Label>
                 <Input
                   id="customGameType"
                   value={customGameType}
                   onChange={(e) => setCustomGameType(e.target.value)}
-                  placeholder="Describe the experience in your own terms"
+                  placeholder={t("wizard.customGameTypePlaceholder")}
                 />
               </div>
             )}
@@ -726,10 +729,7 @@ export function GameSetupWizard({
         {step === 2 ? (
           <>
             <p className="max-w-prose text-sm text-muted">
-              What sections do you want to organize this project around? These
-              become top-level folders in Project Structure (Focus Space). No
-              importance sliders — areas are where ideas live, not what the game
-              emphasizes.
+              {t("wizard.areasHelpGame")}
             </p>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {allAreas.map((area) => {
@@ -761,7 +761,7 @@ export function GameSetupWizard({
                         <span className="font-medium">{area.name}</span>
                         {area.isCustom ? (
                           <span className="text-[10px] uppercase text-muted">
-                            Custom
+                            {t("wizard.custom")}
                           </span>
                         ) : null}
                       </div>
@@ -778,7 +778,7 @@ export function GameSetupWizard({
               <Input
                 value={customAreaName}
                 onChange={(e) => setCustomAreaName(e.target.value)}
-                placeholder="Add custom project area"
+                placeholder={t("wizard.addCustomArea")}
               />
               <Button
                 type="button"
@@ -797,7 +797,7 @@ export function GameSetupWizard({
                   setCustomAreaName("");
                 }}
               >
-                Add
+                {t("common.add")}
               </Button>
             </div>
           </>
@@ -806,9 +806,7 @@ export function GameSetupWizard({
         {step === 3 ? (
           <>
             <p className="max-w-prose text-sm text-muted">
-              What should the game emphasize? Design Focuses are analysis
-              criteria with target importance — not Project Structure folders.
-              Adjust freely; values are independent and need not sum to 100.
+              {t("wizard.focusHelpGame")}
             </p>
             <div className="space-y-5">
               {(
@@ -819,15 +817,21 @@ export function GameSetupWizard({
                       genreKey,
                       label:
                         genreKey === primaryGenreKey
-                          ? `Primary · ${getGenreTemplate(genreKey)?.name ?? genreKey}`
-                          : `Secondary · ${getGenreTemplate(genreKey)?.name ?? genreKey}`,
+                          ? t("wizard.primaryBadge", {
+                              genre:
+                                getGenreTemplate(genreKey)?.name ?? genreKey,
+                            })
+                          : t("wizard.secondaryBadge", {
+                              genre:
+                                getGenreTemplate(genreKey)?.name ?? genreKey,
+                            }),
                       focuses: allFocuses.filter(
                         (f) => f.templateSource === genreKey,
                       ),
                     })),
                   {
                     genreKey: "custom",
-                    label: "Custom focuses",
+                    label: t("wizard.customFocuses"),
                     focuses: allFocuses.filter((f) => f.isCustom),
                   },
                 ] as const
@@ -879,7 +883,7 @@ export function GameSetupWizard({
                                   </span>
                                   {focus.isCustom ? (
                                     <span className="text-[10px] uppercase text-muted">
-                                      Custom
+                                      {t("wizard.custom")}
                                     </span>
                                   ) : null}
                                 </div>
@@ -896,7 +900,7 @@ export function GameSetupWizard({
                                 {checked ? (
                                   <div className="mt-3">
                                     <div className="mb-1 flex justify-between text-xs text-muted">
-                                      <span>Target importance</span>
+                                      <span>{t("wizard.targetImportance")}</span>
                                       <span>
                                         {importance[focus.key] ??
                                           focus.targetImportance}
@@ -919,7 +923,7 @@ export function GameSetupWizard({
                                       className="w-full accent-[var(--accent)]"
                                     />
                                     <p className="mt-1 text-[11px] leading-snug text-muted">
-                                      {IMPORTANCE_SLIDER_FALLBACK}
+                                      {t("wizard.importanceHint")}
                                     </p>
                                   </div>
                                 ) : null}
@@ -937,7 +941,7 @@ export function GameSetupWizard({
               <Input
                 value={customFocusName}
                 onChange={(e) => setCustomFocusName(e.target.value)}
-                placeholder="Add custom design focus"
+                placeholder={t("wizard.addCustomFocus")}
               />
               <Button
                 type="button"
@@ -958,7 +962,7 @@ export function GameSetupWizard({
                   setCustomFocusName("");
                 }}
               >
-                Add
+                {t("common.add")}
               </Button>
             </div>
           </>
@@ -967,14 +971,16 @@ export function GameSetupWizard({
         {step === 4 ? (
           <div className="space-y-4 text-sm">
             <div className="surface-card p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">Intent</p>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                {t("wizard.reviewIntent")}
+              </p>
               <p className="mt-2 whitespace-pre-wrap leading-relaxed">
                 {intent || "—"}
               </p>
             </div>
             <div className="surface-card p-4">
               <p className="text-xs uppercase tracking-wide text-muted">
-                Primary genre
+                {t("wizard.primaryGenre")}
               </p>
               <p className="mt-1 font-medium">
                 {getGenreTemplate(primaryGenreKey)?.name ?? "—"}
@@ -982,7 +988,7 @@ export function GameSetupWizard({
               {secondaryGenreKeys.length > 0 ? (
                 <>
                   <p className="mt-4 text-xs uppercase tracking-wide text-muted">
-                    Secondary / influences
+                    {t("wizard.secondaryGenres")}
                   </p>
                   <p className="mt-1">
                     {secondaryGenreKeys
@@ -994,7 +1000,7 @@ export function GameSetupWizard({
               {customGameType ? (
                 <>
                   <p className="mt-4 text-xs uppercase tracking-wide text-muted">
-                    Custom game type
+                    {t("wizard.customGameType")}
                   </p>
                   <p className="mt-1">{customGameType}</p>
                 </>
@@ -1002,10 +1008,10 @@ export function GameSetupWizard({
             </div>
             <div className="surface-card p-4">
               <p className="text-xs uppercase tracking-wide text-muted">
-                Project Areas ({selectedAreaKeys.size})
+                {t("wizard.reviewAreas", { count: selectedAreaKeys.size })}
               </p>
               <p className="mt-1 text-xs text-muted">
-                Structural folders in Focus Space — no importance.
+                {t("wizard.reviewAreasHint")}
               </p>
               <ul className="mt-2 space-y-1">
                 {allAreas
@@ -1017,10 +1023,10 @@ export function GameSetupWizard({
             </div>
             <div className="surface-card p-4">
               <p className="text-xs uppercase tracking-wide text-muted">
-                Design Focuses ({selectedFocusKeys.size})
+                {t("wizard.reviewFocuses", { count: selectedFocusKeys.size })}
               </p>
               <p className="mt-1 text-xs text-muted">
-                Emphasis criteria with target importance — separate from structure.
+                {t("wizard.reviewFocusesHint")}
               </p>
               <ul className="mt-2 space-y-1">
                 {allFocuses
@@ -1030,7 +1036,9 @@ export function GameSetupWizard({
                       {f.parentName ? `${f.parentName} → ` : ""}
                       {f.name}{" "}
                       <span className="text-muted">
-                        · target {importance[f.key] ?? f.targetImportance}
+                        {t("wizard.targetValue", {
+                          value: importance[f.key] ?? f.targetImportance,
+                        })}
                       </span>
                     </li>
                   ))}
@@ -1049,7 +1057,7 @@ export function GameSetupWizard({
               disabled={step === 0 || busy}
               onClick={() => setStep((s) => Math.max(0, s - 1))}
             >
-              Back
+              {t("common.back")}
             </Button>
           </div>
           {step === 0 ? (
@@ -1058,7 +1066,9 @@ export function GameSetupWizard({
               disabled={!intent.trim() || busy}
               onClick={generateAndContinue}
             >
-              {suggesting ? "Generating suggestions…" : "Generate suggestions"}
+              {suggesting
+                ? t("wizard.generating")
+                : t("wizard.generateSuggestions")}
             </Button>
           ) : step < steps.length - 1 ? (
             <Button
@@ -1073,11 +1083,11 @@ export function GameSetupWizard({
               }
               onClick={() => setStep((s) => s + 1)}
             >
-              Continue
+              {t("wizard.continue")}
             </Button>
           ) : (
             <Button type="button" disabled={busy} onClick={submit}>
-              {pending ? "Saving…" : "Finish setup"}
+              {pending ? t("wizard.saving") : t("wizard.finishSetup")}
             </Button>
           )}
         </div>
@@ -1085,14 +1095,14 @@ export function GameSetupWizard({
 
       <ConfirmDialog
         open={leaveOpen}
-        title="Leave project setup?"
+        title={t("wizard.leaveTitle")}
         message={
           hasProgressBeyondStart()
-            ? `Discard draft project “${projectName}” and return home? Setup progress will be lost and the draft will be deleted.`
-            : `Leave setup and delete draft project “${projectName}”?`
+            ? t("wizard.leaveDiscardProgress", { name: projectName })
+            : t("wizard.leaveDiscardDraft", { name: projectName })
         }
-        cancelLabel="Stay"
-        confirmLabel={cancelling ? "Discarding…" : "Leave"}
+        cancelLabel={t("wizard.stay")}
+        confirmLabel={cancelling ? t("wizard.discarding") : t("wizard.leave")}
         pending={cancelling}
         onCancel={() => setLeaveOpen(false)}
         onConfirm={confirmLeaveSetup}

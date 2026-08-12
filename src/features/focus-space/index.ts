@@ -44,7 +44,6 @@ export {
   scoreVisibleRelations,
   filterRelationsForMode,
   MIN_VISIBLE_RELATION,
-  STRONG_RELATION_THRESHOLD,
   RELATION_WEIGHTS,
 } from "./relation-strength";
 export type {
@@ -59,12 +58,28 @@ export { StructureBlobPropertiesDialog } from "./structure-blob-properties-dialo
 export { FocusIdeaEditor } from "./focus-idea-editor";
 export { StructureNodeEditor } from "./structure-node-editor";
 export { StructureViewSwitcher } from "./structure-view-switcher";
-export { structureFocusHref, parseStructureView } from "./structure-href";
-export type { StructureViewMode } from "./structure-href";
+export {
+  structureFocusHref,
+  structureEntryHref,
+  structureNodeInfoHref,
+  parseStructureView,
+  rememberStructureReturn,
+  readStructureReturn,
+  structureViewRespectingBlobCap,
+  BLOB_VIEW_MAX_CHILDREN,
+} from "./structure-href";
+export type { StructureViewMode, StructureReturnState } from "./structure-href";
 export { StructureTreePanel } from "./structure-tree-panel";
 export { StructureDetailsPanel } from "./structure-details-panel";
 export { StructureSuggestButton } from "./structure-suggest-button";
 export { CombineNotesControl } from "./combine-notes-control";
+export {
+  structureNodeMenuItems,
+  structurePaneMenuItems,
+  designFocusBlobMenuItems,
+  boardNodeMenuItems,
+} from "./structure-context-menu";
+export type { StructureContextMenuState } from "./structure-context-menu";
 export { buildFocusLevelSummaryCopy } from "./focus-level-copy";
 export { IDLE_SATELLITE_COUNT } from "./focus-blob-color";
 export {

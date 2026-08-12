@@ -19,6 +19,7 @@ export {
   getAuthStatus,
   getLocalAuthUser,
   getLocalSession,
-  signInWithProvider,
-  signOut,
 } from "./session";
+export { AuthSessionProvider } from "./session-provider";
+export { getAuthBootstrap } from "./actions";
+export type { LinkedProvider } from "./actions";

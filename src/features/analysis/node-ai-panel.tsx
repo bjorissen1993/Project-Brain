@@ -11,6 +11,7 @@ import {
   type NodeAnalysisView,
 } from "@/features/analysis/actions";
 import { LOW_CONFIDENCE_THRESHOLD } from "@/features/ai/node-analysis-schema";
+import { useLocale, useT } from "@/features/i18n";
 import { cn } from "@/lib/utils";
 
 export function NodeAIPanel({
@@ -25,6 +26,8 @@ export function NodeAIPanel({
   analysis: NodeAnalysisView | null;
   designFocusOptions: { id: string; name: string }[];
 }) {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -39,12 +42,8 @@ export function NodeAIPanel({
   if (nodeStatus !== "READY") {
     return (
       <section className="space-y-2 border-t border-border pt-8">
-        <h2 className="font-display text-xl">AI analysis</h2>
-        <p className="text-sm text-muted">
-          Mark this node <span className="text-foreground">Ready</span> to run
-          selective AI analysis. Results are advisory — never auto-applied as
-          relations.
-        </p>
+        <h2 className="font-display text-xl">{t("analysis.nodeTitle")}</h2>
+        <p className="text-sm text-muted">{t("analysis.nodeReadyGate")}</p>
       </section>
     );
   }
@@ -53,7 +52,7 @@ export function NodeAIPanel({
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      const result = await reanalyzeNodeAction(nodeId);
+      const result = await reanalyzeNodeAction(nodeId, { locale });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -67,18 +66,15 @@ export function NodeAIPanel({
     <section className="space-y-5 border-t border-border pt-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl">AI analysis</h2>
-          <p className="mt-1 text-sm text-muted">
-            Advisory only. Creator corrections always win. Relations are never
-            auto-created.
-          </p>
+          <h2 className="font-display text-xl">{t("analysis.nodeTitle")}</h2>
+          <p className="mt-1 text-sm text-muted">{t("analysis.nodeAdvisory")}</p>
         </div>
         <Button
           variant="secondary"
           disabled={pending}
           onClick={runReanalyze}
         >
-          {pending ? "Analyzing…" : "Quick reanalyse"}
+          {pending ? t("analysis.analyzing") : t("analysis.reanalyse")}
         </Button>
       </div>
 
@@ -87,24 +83,22 @@ export function NodeAIPanel({
 
       {!analysis || analysis.analysisStatus === "none" ? (
         <div className="surface-card border-dashed px-4 py-4 text-sm text-muted">
-          No analysis yet. Saving with status Ready triggers analysis
-          automatically.
+          {t("analysis.noAnalysis")}
         </div>
       ) : null}
 
       {analysis?.analysisStatus === "deferred" ? (
         <div className="rounded-[var(--radius)] border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
-          {analysis.analysisMessage ??
-            "Analysis pending — configure OPENAI_API_KEY"}
+          {analysis.analysisMessage ?? t("analysis.pendingKey")}
         </div>
       ) : null}
 
       {analysis?.analysisStatus === "failed" ? (
         <div className="rounded-[var(--radius)] border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
-          {analysis.analysisMessage ?? "Analysis failed"}
+          {analysis.analysisMessage ?? t("analysis.failed")}
           <div className="mt-2">
             <Button variant="secondary" disabled={pending} onClick={runReanalyze}>
-              Retry
+              {t("analysis.retry")}
             </Button>
           </div>
         </div>
@@ -112,13 +106,11 @@ export function NodeAIPanel({
 
       {analysis?.isOutdated || analysis?.analysisStatus === "outdated" ? (
         <div className="rounded-[var(--radius)] border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
-          <p className="font-semibold text-warning">Analysis outdated</p>
-          <p className="mt-1 text-muted">
-            Node content or project intent changed after the last analysis.
-          </p>
+          <p className="font-semibold text-warning">{t("analysis.outdated")}</p>
+          <p className="mt-1 text-muted">{t("analysis.outdatedBody")}</p>
           <div className="mt-2">
             <Button variant="secondary" disabled={pending} onClick={runReanalyze}>
-              Quick reanalyse
+              {t("analysis.reanalyse")}
             </Button>
           </div>
         </div>
@@ -146,7 +138,7 @@ export function NodeAIPanel({
             <p className="text-xs text-muted">
               Model {analysis.model}
               {analysis.analyzedAt
-                ? ` · ${new Date(analysis.analyzedAt).toLocaleString()}`
+                ? ` · ${new Date(analysis.analyzedAt).toLocaleString(locale)}`
                 : ""}
             </p>
           ) : null}
@@ -388,9 +380,6 @@ export function NodeAIPanel({
       {analysis && analysis.suggestedRelations.length > 0 ? (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold">Suggested connections</h3>
-          <p className="text-xs text-muted">
-            Accept creates a real relation. Reject dismisses the suggestion.
-          </p>
           <ul className="space-y-2">
             {analysis.suggestedRelations.map((rel) => (
               <li
@@ -425,7 +414,7 @@ export function NodeAIPanel({
                         });
                       }}
                     >
-                      Accept
+                      {t("balance.accept")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -443,7 +432,7 @@ export function NodeAIPanel({
                         });
                       }}
                     >
-                      Reject
+                      {t("balance.reject")}
                     </Button>
                   </div>
                 ) : null}

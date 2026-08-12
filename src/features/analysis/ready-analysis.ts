@@ -47,7 +47,7 @@ function suggestionKey(targetNodeId: string, relationType: string) {
  */
 export async function runReadyAnalysis(
   nodeId: string,
-  opts?: { force?: boolean },
+  opts?: { force?: boolean; locale?: "en" | "nl" },
 ): Promise<ReadyAnalysisRunResult> {
   const node = await prisma.node.findUnique({
     where: { id: nodeId },
@@ -60,7 +60,7 @@ export async function runReadyAnalysis(
   const ai = getAIService();
   const result = await ai.analyzeReadyNode(
     { projectId: node.projectId, nodeId: node.id },
-    { modelTier: "quick" },
+    { modelTier: "quick", locale: opts?.locale },
   );
 
   // Deferred: missing API key — record pending analysis, do not fake results.

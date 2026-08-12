@@ -4,9 +4,6 @@
  */
 
 export const MIN_VISIBLE_RELATION = 25;
-export const STRONG_RELATION_THRESHOLD = 60;
-/** Idle Strong mode: keep at most this many edges when many qualify. */
-export const STRONG_MODE_TOP_N = 8;
 /** Hard cap on drawn edges for clutter/performance (10–15 blobs). */
 export const MAX_VISIBLE_RELATIONS = 24;
 
@@ -17,7 +14,8 @@ export const RELATION_WEIGHTS = {
   aiEvidence: 10,
 } as const;
 
-export type RelationMode = "off" | "focused" | "strong" | "all";
+/** Off = none · Focused = hovered blob · Strong = all above threshold */
+export type RelationMode = "off" | "focused" | "strong";
 
 export type RelationSignalBreakdown = {
   explicit: number;
@@ -431,14 +429,8 @@ export function filterRelationsForMode(
     list = list.filter(
       (r) => r.sourceId === focusId || r.targetId === focusId,
     );
-  } else if (mode === "strong") {
-    const strong = list.filter((r) => r.strength >= STRONG_RELATION_THRESHOLD);
-    list =
-      strong.length > 0
-        ? strong.slice(0, STRONG_MODE_TOP_N)
-        : list.slice(0, Math.min(3, STRONG_MODE_TOP_N));
   }
-  // "all" keeps everything above MIN_VISIBLE_RELATION
+  // "strong" = all relations above the visibility threshold
 
   return list.slice(0, MAX_VISIBLE_RELATIONS);
 }
@@ -447,9 +439,11 @@ export function loadRelationMode(projectId: string): RelationMode {
   if (typeof window === "undefined") return "strong";
   try {
     const raw = sessionStorage.getItem(`pb:focus-rel-mode:v1:${projectId}`);
-    if (raw === "off" || raw === "focused" || raw === "strong" || raw === "all") {
+    if (raw === "off" || raw === "focused" || raw === "strong") {
       return raw;
     }
+    // Legacy "all" → Strong (show everything above threshold)
+    if (raw === "all") return "strong";
   } catch {
     /* ignore */
   }

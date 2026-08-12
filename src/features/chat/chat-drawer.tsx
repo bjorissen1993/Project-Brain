@@ -13,12 +13,14 @@ import { Link2, Loader2, MessageSquare, Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Textarea } from "@/components/ui/field";
 import { useOptionalFocusWorkspace } from "@/features/focus-space";
+import { useT, useLocale } from "@/features/i18n";
 import { NODE_TYPE_OPTIONS } from "@/types";
 import { cn } from "@/lib/utils";
 import {
   applyChatProposalsAction,
   attachGptConversationAction,
   clearGptAttachmentAction,
+  dismissChatProposalsAction,
   getOrCreateChatThreadAction,
   sendChatMessageAction,
   type ChatMessageDTO,
@@ -270,6 +272,7 @@ function ProposalCard({
   pathLabel?: string | null;
   allProposals?: ChatProposal[];
 }) {
+  const t = useT();
   const workspace = useOptionalFocusWorkspace();
   const title =
     proposal.kind === "update_node"
@@ -281,8 +284,8 @@ function ProposalCard({
     proposal.kind === "create_node"
       ? typeLabel(proposal.type)
       : proposal.kind === "update_node"
-        ? "Update"
-        : "Design Focus";
+        ? t("chat.update")
+        : t("nav.designFocus");
   const body =
     proposal.kind === "create_node"
       ? proposal.content
@@ -326,7 +329,9 @@ function ProposalCard({
           </p>
           {hierarchyLabel ? (
             <p className="mt-0.5 text-[11px] text-muted">
-              {proposal.kind === "update_node" ? "Target: " : "Under: "}
+              {proposal.kind === "update_node"
+                ? t("chat.target")
+                : t("chat.under")}{" "}
               {hierarchyLabel}
             </p>
           ) : null}
@@ -396,27 +401,33 @@ function MessageBubble({
   projectId: string;
   onThreadUpdate: (thread: ChatThreadDTO) => void;
 }) {
+  const t = useT();
   const proposals = message.proposals;
   const meta =
     message.metadata && typeof message.metadata === "object"
       ? (message.metadata as {
           appliedAt?: string;
+          dismissedAt?: string;
           copyProfileSourceIds?: string[];
           created?: { id: string; name: string }[];
         })
       : null;
   const applied = Boolean(meta?.appliedAt);
+  const dismissed = Boolean(meta?.dismissedAt);
+  const handled = applied || dismissed;
   const copyTargets = (meta?.copyProfileSourceIds ?? []).map((id) => ({
     id,
     name: meta?.created?.find((c) => c.id === id)?.name ?? "profile",
   }));
 
   const [rows, setRows] = useState<SuggestionRow[]>(() =>
-    (proposals ?? []).map((p, i) => ({
-      ...p,
-      key: `${message.id}-${i}`,
-      selected: true,
-    })),
+    handled
+      ? []
+      : (proposals ?? []).map((p, i) => ({
+          ...p,
+          key: `${message.id}-${i}`,
+          selected: true,
+        })),
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -426,6 +437,9 @@ function MessageBubble({
     name: string;
   } | null>(null);
 
+  // Applied/dismissed messages never show pending Accept cards (even if local
+  // rows lagged before remount via key on the parent list).
+  const visibleRows = handled ? [] : rows;
   if (message.role === "system") {
     return (
       <div className="space-y-2">
@@ -461,8 +475,8 @@ function MessageBubble({
   }
 
   const isUser = message.role === "user";
-  const overflow = Math.max(0, rows.length - CHAT_PROPOSAL_INLINE);
-  const inlineRows = rows.slice(0, CHAT_PROPOSAL_INLINE);
+  const overflow = Math.max(0, visibleRows.length - CHAT_PROPOSAL_INLINE);
+  const inlineRows = visibleRows.slice(0, CHAT_PROPOSAL_INLINE);
 
   const applySelected = (selected: SuggestionRow[]) => {
     setError(null);
@@ -476,7 +490,25 @@ function MessageBubble({
         setError(result.error);
         return;
       }
+      setRows([]);
       setModalOpen(false);
+      onThreadUpdate(result.thread);
+    });
+  };
+
+  const dismissAll = () => {
+    setError(null);
+    setRows([]);
+    setModalOpen(false);
+    startTransition(async () => {
+      const result = await dismissChatProposalsAction({
+        projectId,
+        messageId: message.id,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       onThreadUpdate(result.thread);
     });
   };
@@ -492,124 +524,127 @@ function MessageBubble({
     >
       <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
 
-      {!isUser && (proposals?.length ?? 0) > 0 && rows.length > 0 ? (
+      {!isUser && applied && (proposals?.length ?? 0) > 0 ? (
+        <p className="mt-2 border-t border-border pt-2 text-xs text-accent">
+          Suggestions applied.
+        </p>
+      ) : null}
+
+      {!isUser && !handled && (proposals?.length ?? 0) > 0 && visibleRows.length > 0 ? (
         <div className="mt-2 space-y-2 border-t border-border pt-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
               Suggested actions — accept to apply
             </p>
             <p className="text-[11px] text-muted">
-              {rows.length} suggestion{rows.length === 1 ? "" : "s"} total
+              {visibleRows.length} suggestion
+              {visibleRows.length === 1 ? "" : "s"} total
             </p>
           </div>
-          {applied ? (
-            <p className="text-xs text-accent">Already applied.</p>
-          ) : (
-            <>
-              <ul className="space-y-2">
-                {inlineRows.map((row) => (
-                  <ProposalCard
-                    key={row.key}
-                    proposal={row}
-                    selected={row.selected}
-                    allProposals={rows}
-                    onToggle={() =>
-                      setRows((prev) =>
-                        prev.map((r) =>
-                          r.key === row.key
-                            ? { ...r, selected: !r.selected }
-                            : r,
-                        ),
-                      )
-                    }
-                    onReject={() =>
-                      setRows((prev) => prev.filter((r) => r.key !== row.key))
-                    }
-                  />
-                ))}
-              </ul>
-              {overflow > 0 ? (
-                <button
-                  type="button"
-                  className="text-xs font-medium text-nav hover:text-nav-hover"
-                  onClick={() => setModalOpen(true)}
-                >
-                  +{overflow} more — view all {rows.length} suggestions
-                </button>
-              ) : null}
-              <FieldError>{error}</FieldError>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="primary"
-                  className="text-xs"
-                  disabled={pending || !rows.some((r) => r.selected)}
-                  onClick={() => applySelected(rows.filter((r) => r.selected))}
-                >
-                  {pending ? "Applying…" : "Accept selected"}
-                </Button>
-                {rows.length > CHAT_PROPOSAL_INLINE ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="text-xs"
-                    disabled={pending}
-                    onClick={() => setModalOpen(true)}
-                  >
-                    Open all
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-xs"
-                  disabled={pending}
-                  onClick={() => setRows([])}
-                >
-                  Dismiss
-                </Button>
-              </div>
-              <SuggestionsModal
-                open={modalOpen}
-                title="All suggested actions"
-                subtitle="Multi-select what to apply. Nothing changes until you accept."
-                rows={rows}
-                error={error}
-                pending={pending}
-                onClose={() => setModalOpen(false)}
-                onToggle={(key) =>
+          <ul className="space-y-2">
+            {inlineRows.map((row) => (
+              <ProposalCard
+                key={row.key}
+                proposal={row}
+                selected={row.selected}
+                allProposals={visibleRows}
+                onToggle={() =>
                   setRows((prev) =>
                     prev.map((r) =>
-                      r.key === key ? { ...r, selected: !r.selected } : r,
+                      r.key === row.key
+                        ? { ...r, selected: !r.selected }
+                        : r,
                     ),
                   )
                 }
-                onReject={(key) =>
-                  setRows((prev) => prev.filter((r) => r.key !== key))
+                onReject={() =>
+                  setRows((prev) => prev.filter((r) => r.key !== row.key))
                 }
-                onSelectAll={() =>
-                  setRows((prev) => prev.map((r) => ({ ...r, selected: true })))
-                }
-                onClearSelection={() =>
-                  setRows((prev) =>
-                    prev.map((r) => ({ ...r, selected: false })),
-                  )
-                }
-                onAccept={() => applySelected(rows.filter((r) => r.selected))}
-                onDismissAll={() => {
-                  setRows([]);
-                  setModalOpen(false);
-                }}
               />
-            </>
-          )}
+            ))}
+          </ul>
+          {overflow > 0 ? (
+            <button
+              type="button"
+              className="text-xs font-medium text-nav hover:text-nav-hover"
+              onClick={() => setModalOpen(true)}
+            >
+              +{overflow} more — view all {visibleRows.length} suggestions
+            </button>
+          ) : null}
+          <FieldError>{error}</FieldError>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              className="text-xs"
+              disabled={pending || !visibleRows.some((r) => r.selected)}
+              onClick={() =>
+                applySelected(visibleRows.filter((r) => r.selected))
+              }
+            >
+              {pending ? t("chat.applying") : t("chat.acceptSelected")}
+            </Button>
+            {visibleRows.length > CHAT_PROPOSAL_INLINE ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="text-xs"
+                disabled={pending}
+                onClick={() => setModalOpen(true)}
+              >
+                {t("common.open")}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-xs"
+              disabled={pending}
+              onClick={dismissAll}
+            >
+              {t("common.dismiss")}
+            </Button>
+          </div>
+          <SuggestionsModal
+            open={modalOpen}
+            title={t("chat.allActions")}
+            subtitle={t("chat.allActionsSub")}
+            rows={visibleRows}
+            error={error}
+            pending={pending}
+            onClose={() => setModalOpen(false)}
+            onToggle={(key) =>
+              setRows((prev) =>
+                prev.map((r) =>
+                  r.key === key ? { ...r, selected: !r.selected } : r,
+                ),
+              )
+            }
+            onReject={(key) =>
+              setRows((prev) => prev.filter((r) => r.key !== key))
+            }
+            onSelectAll={() =>
+              setRows((prev) => prev.map((r) => ({ ...r, selected: true })))
+            }
+            onClearSelection={() =>
+              setRows((prev) =>
+                prev.map((r) => ({ ...r, selected: false })),
+              )
+            }
+            onAccept={() =>
+              applySelected(visibleRows.filter((r) => r.selected))
+            }
+            onDismissAll={dismissAll}
+          />
         </div>
       ) : null}
     </div>
   );
 }
-
 export function ChatDrawer({ projectId }: { projectId: string }) {
+  const t = useT();
+  const locale = useLocale();
   const { open, setOpen } = useChatPanel();
   const workspace = useOptionalFocusWorkspace();
   const pathname = usePathname() ?? "";
@@ -661,13 +696,13 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
       } catch (error) {
         if (cancelled) return;
         console.error("[chat] failed to load thread", error);
-        setLoadError("Chat is temporarily unavailable");
+        setLoadError(t("chat.unavailable"));
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [open, projectId, contextNodeId]);
+  }, [open, projectId, contextNodeId, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -744,6 +779,7 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
         message: text,
         contextNodeId,
         focusSummary,
+        locale,
       });
 
       // Keep applying a late success even after the client timeout cleared Thinking.
@@ -803,24 +839,24 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
       : null);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Project AI chat">
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={t("chat.aria")}>
       <button
         type="button"
         className="absolute inset-0 bg-black/50"
-        aria-label="Close chat"
+        aria-label={t("chat.closeChat")}
         onClick={() => setOpen(false)}
       />
-      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-border bg-panel shadow-2xl sm:max-w-lg">
-        <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+      <aside className="safe-pb relative flex h-full w-full max-w-md flex-col border-l border-border bg-panel shadow-2xl sm:max-w-lg">
+        <header className="flex min-h-12 items-center justify-between gap-2 border-b border-border px-4 py-3">
           <div className="min-w-0">
             <p className="flex items-center gap-2 font-display text-sm font-semibold tracking-wide">
               <MessageSquare size={16} className="text-nav" aria-hidden />
-              Project Chat
+              {t("chat.title")}
             </p>
             <p className="mt-0.5 text-[11px] text-muted">
               {contextLabel
-                ? `Scoped to “${contextLabel}” — accept to apply changes.`
-                : "Project root — advisory until you accept."}
+                ? t("chat.scoped", { name: contextLabel })
+                : t("chat.projectRoot")}
             </p>
           </div>
           <Button
@@ -828,7 +864,7 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
             variant="ghost"
             className="h-8 w-8 shrink-0 p-0"
             onClick={() => setOpen(false)}
-            aria-label="Close"
+            aria-label={t("common.close")}
           >
             <X size={18} />
           </Button>
@@ -836,9 +872,9 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
 
         {!thread?.aiAvailable ? (
           <div className="mx-4 mt-3 rounded-[var(--radius)] border border-border bg-muted-bg px-3 py-2 text-xs text-muted">
-            Chat replies are pending — configure{" "}
-            <code className="text-foreground">OPENAI_API_KEY</code> on the
-            server. Messages still save to this project.
+            {t("chat.aiPending")}{" "}
+            <code className="text-foreground">OPENAI_API_KEY</code>{" "}
+            {t("chat.aiPendingSuffix")}
           </div>
         ) : null}
 
@@ -846,16 +882,16 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
           <div className="mx-4 mt-3 flex items-start justify-between gap-2 rounded-[var(--radius)] border border-border bg-panel-elevated/60 px-3 py-2 text-xs text-muted">
             <div className="min-w-0">
               <p className="font-medium text-foreground">
-                GPT conversation attached
+                {t("chat.gptAttached")}
               </p>
               <p className="mt-0.5">
-                Source:{" "}
+                {t("chat.sourcePrefix")}{" "}
                 {thread.attachedGptSource === "share_fetch"
-                  ? "public share link (may be partial)"
+                  ? t("chat.sourceShare")
                   : thread.attachedGptSource === "paste"
-                    ? "pasted transcript"
-                    : "link only — paste transcript needed"}
-                . Private ChatGPT history is never synced automatically.
+                    ? t("chat.sourcePaste")
+                    : t("chat.sourceFailed")}
+                {t("chat.sourceSuffix")}
               </p>
             </div>
             <Button
@@ -877,7 +913,7 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
                 });
               }}
             >
-              Clear
+              {t("common.clear")}
             </Button>
           </div>
         ) : null}
@@ -885,21 +921,35 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
         <div className="scrollbar-thin flex-1 space-y-3 overflow-y-auto px-4 py-3">
           {loading && !thread ? (
             <p className="flex items-center gap-2 text-sm text-muted">
-              <Loader2 size={14} className="animate-spin" /> Loading chat…
+              <Loader2 size={14} className="animate-spin" /> {t("chat.loading")}
             </p>
           ) : null}
           <FieldError>{loadError}</FieldError>
-          {thread?.messages.map((m) => (
-            <MessageBubble
-              key={m.id}
-              message={m}
-              projectId={projectId}
-              onThreadUpdate={setThread}
-            />
-          ))}
+          {thread?.messages.map((m) => {
+            const mMeta =
+              m.metadata && typeof m.metadata === "object"
+                ? (m.metadata as {
+                    appliedAt?: string;
+                    dismissedAt?: string;
+                  })
+                : null;
+            const statusKey = mMeta?.appliedAt
+              ? "applied"
+              : mMeta?.dismissedAt
+                ? "dismissed"
+                : "open";
+            return (
+              <MessageBubble
+                key={`${m.id}:${statusKey}`}
+                message={m}
+                projectId={projectId}
+                onThreadUpdate={setThread}
+              />
+            );
+          })}
           {sending ? (
             <p className="flex items-center gap-2 text-xs text-muted">
-              <Loader2 size={12} className="animate-spin" /> Thinking…
+              <Loader2 size={12} className="animate-spin" /> {t("chat.thinking")}
             </p>
           ) : null}
           {!sending && sendError ? (
@@ -920,19 +970,16 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
             onClick={() => setShowAttach((v) => !v)}
           >
             <Paperclip size={12} aria-hidden />
-            Attach GPT conversation link
+            {t("chat.attachToggle")}
           </button>
 
           {showAttach ? (
             <div className="mb-3 space-y-2 rounded-[var(--radius)] border border-border bg-panel-elevated/40 p-3">
               <p className="text-xs text-muted">
-                Use a public <strong className="font-medium text-foreground">share</strong>{" "}
-                link (<code className="text-[11px]">chatgpt.com/share/…</code>)
-                or paste the transcript. Private{" "}
-                <code className="text-[11px]">/c/…</code> links cannot be fetched.
+                {t("chat.attachHelp")}
               </p>
               <div>
-                <Label htmlFor="gpt-url">Share link</Label>
+                <Label htmlFor="gpt-url">{t("chat.shareLink")}</Label>
                 <Input
                   id="gpt-url"
                   value={gptUrl}
@@ -942,7 +989,7 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
                 />
               </div>
               <div>
-                <Label htmlFor="gpt-transcript">Paste transcript / export</Label>
+                <Label htmlFor="gpt-transcript">{t("chat.pasteTranscript")}</Label>
                 <Textarea
                   id="gpt-transcript"
                   value={gptTranscript}
@@ -953,7 +1000,7 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
                   }
                   rows={4}
                   maxLength={GPT_TRANSCRIPT_MAX_CHARS}
-                  placeholder="Paste conversation text if the share link isn’t readable…"
+                  placeholder={t("chat.pastePlaceholder")}
                   disabled={attaching}
                 />
                 <p className="mt-1 text-right text-[11px] text-muted">
@@ -993,7 +1040,7 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
                 }}
               >
                 <Link2 size={14} aria-hidden />
-                {attaching ? "Attaching…" : "Attach"}
+                {attaching ? t("chat.attaching") : t("chat.attach")}
               </Button>
             </div>
           ) : null}
@@ -1008,8 +1055,8 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
               maxLength={CHAT_MESSAGE_MAX_CHARS}
               placeholder={
                 contextLabel
-                  ? `Ask about ${contextLabel}, or propose nodes…`
-                  : "Ask about intent, structure, balance…"
+                  ? t("chat.placeholderScoped", { name: contextLabel })
+                  : t("chat.placeholderRoot")
               }
               disabled={sending}
               onKeyDown={(e) => {
@@ -1031,7 +1078,7 @@ export function ChatDrawer({ projectId }: { projectId: string }) {
             <FieldError>{sendError}</FieldError>
             <div className="flex justify-end">
               <Button type="submit" disabled={sending || !input.trim()}>
-                {sending ? "Sending…" : "Send"}
+                {sending ? t("common.sending") : t("common.send")}
               </Button>
             </div>
           </form>

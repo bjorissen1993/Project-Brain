@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useLocale, useT, type MessageKey } from "@/features/i18n";
 import { cn } from "@/lib/utils";
 import {
   GAME_PHASE_OPTIONS,
@@ -29,30 +30,33 @@ const DAY_PREVIEW_LIMIT = 7;
 
 const PHASES = GAME_PHASE_OPTIONS.map((p) => p.value);
 
+const PHASE_LABEL_KEY: Record<GamePhase, MessageKey> = {
+  EARLY: "timeline.phaseEarly",
+  MID: "timeline.phaseMid",
+  LATE: "timeline.phaseLate",
+  ENDGAME: "timeline.phaseEnd",
+};
+
 const PHASE_STYLE: Record<
   GamePhase,
-  { label: string; band: string; dot: string; chip: string }
+  { band: string; dot: string; chip: string }
 > = {
   EARLY: {
-    label: "Early",
     band: "from-[color-mix(in_oklab,var(--nav)_18%,transparent)] to-transparent",
     dot: "bg-[var(--nav)] shadow-[0_0_0_3px_color-mix(in_oklab,var(--nav)_28%,transparent)]",
     chip: "text-[var(--nav)] bg-[var(--nav-muted)]",
   },
   MID: {
-    label: "Mid",
     band: "from-[color-mix(in_oklab,var(--accent)_16%,transparent)] to-transparent",
     dot: "bg-[var(--accent)] shadow-[0_0_0_3px_color-mix(in_oklab,var(--accent)_28%,transparent)]",
     chip: "text-[var(--accent)] bg-[var(--accent-muted)]",
   },
   LATE: {
-    label: "Late",
     band: "from-[color-mix(in_oklab,var(--warning)_16%,transparent)] to-transparent",
     dot: "bg-[var(--warning)] shadow-[0_0_0_3px_color-mix(in_oklab,var(--warning)_28%,transparent)]",
     chip: "text-[var(--warning)] bg-[color-mix(in_oklab,var(--warning)_16%,transparent)]",
   },
   ENDGAME: {
-    label: "End",
     band: "from-[color-mix(in_oklab,var(--purple)_18%,transparent)] to-transparent",
     dot: "bg-[var(--purple)] shadow-[0_0_0_3px_color-mix(in_oklab,var(--purple)_28%,transparent)]",
     chip: "text-[var(--purple)] bg-[color-mix(in_oklab,var(--purple)_18%,transparent)]",
@@ -75,8 +79,8 @@ function dayKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function formatDayLabel(date: Date) {
-  return date.toLocaleDateString(undefined, {
+function formatDayLabel(date: Date, locale: string) {
+  return date.toLocaleDateString(locale, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -84,8 +88,8 @@ function formatDayLabel(date: Date) {
   });
 }
 
-function formatTime(date: Date) {
-  return date.toLocaleTimeString(undefined, {
+function formatTime(date: Date, locale: string) {
+  return date.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -110,6 +114,8 @@ export function TimelineView({
   projectId: string;
   nodes: TimelineNode[];
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [sortKey, setSortKey] = useState<SortKey>("updatedAt");
   const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>("ALL");
   /** Session overrides: past days default collapsed; today/future default expanded. */
@@ -120,7 +126,6 @@ export function TimelineView({
   const [showAllByDay, setShowAllByDay] = useState<Record<string, boolean>>({});
 
   const hasPhases = nodes.some((n) => n.gamePhase);
-  const acts = useMemo(() => nodes.filter((n) => n.type === "ACT"), [nodes]);
 
   const phaseCounts = useMemo(() => {
     const counts: Record<GamePhase, number> = {
@@ -168,8 +173,12 @@ export function TimelineView({
   }, [filtered, sortKey]);
 
   const dayGroups = useMemo(() => {
-    const groups: { key: string; label: string; date: Date; items: TimelineEntry[] }[] =
-      [];
+    const groups: {
+      key: string;
+      label: string;
+      date: Date;
+      items: TimelineEntry[];
+    }[] = [];
     for (const entry of entries) {
       const key = dayKey(entry.at);
       const last = groups[groups.length - 1];
@@ -178,14 +187,14 @@ export function TimelineView({
       } else {
         groups.push({
           key,
-          label: formatDayLabel(entry.at),
+          label: formatDayLabel(entry.at, locale),
           date: entry.at,
           items: [entry],
         });
       }
     }
     return groups;
-  }, [entries]);
+  }, [entries, locale]);
 
   const unphasedCount = nodes.filter((n) => !n.gamePhase).length;
 
@@ -216,13 +225,9 @@ export function TimelineView({
     <div className="mx-auto w-full max-w-[1600px] space-y-6 px-6 py-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-3xl">Timeline</h1>
+          <h1 className="font-display text-3xl">{t("timeline.title")}</h1>
           <p className="mt-2 max-w-prose text-sm text-muted">
-            Nodes along a chronological axis
-            {hasPhases ? ", with priority-phase bands when tagged" : ""}.
-            {acts.length
-              ? ` ${acts.length} act${acts.length === 1 ? "" : "s"} marked as milestones.`
-              : ""}
+            {t("timeline.subtitle")}
           </p>
         </div>
 
@@ -230,12 +235,12 @@ export function TimelineView({
           <div
             className="inline-flex rounded-[var(--radius)] border border-border bg-panel p-0.5"
             role="group"
-            aria-label="Sort by"
+            aria-label={t("timeline.sortBy")}
           >
             {(
               [
-                { key: "updatedAt", label: "Updated" },
-                { key: "createdAt", label: "Created" },
+                { key: "updatedAt" as const, label: t("timeline.updated") },
+                { key: "createdAt" as const, label: t("timeline.created") },
               ] as const
             ).map((opt) => (
               <button
@@ -254,7 +259,10 @@ export function TimelineView({
             ))}
           </div>
           <p className="text-[11px] text-muted tabular-nums">
-            {filtered.length} / {nodes.length} nodes
+            {t("timeline.nodesCount", {
+              shown: filtered.length,
+              total: nodes.length,
+            })}
           </p>
         </div>
       </header>
@@ -262,16 +270,16 @@ export function TimelineView({
       {hasPhases ? (
         <section
           className="overflow-hidden rounded-[var(--radius)] border border-border bg-panel"
-          aria-label="Game phase overview"
+          aria-label={t("timeline.gamePhaseOverview")}
         >
           <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Phase bands
+              {t("timeline.phaseBands")}
             </p>
             <p className="text-[11px] text-muted">
               {unphasedCount
-                ? `${unphasedCount} untagged`
-                : "All tagged"}
+                ? t("timeline.untagged", { count: unphasedCount })
+                : t("timeline.allTagged")}
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4">
@@ -296,7 +304,7 @@ export function TimelineView({
                   )}
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-                    {style.label}
+                    {t(PHASE_LABEL_KEY[phase])}
                   </p>
                   <p className="mt-1 font-display text-2xl tabular-nums">
                     {phaseCounts[phase]}
@@ -308,9 +316,15 @@ export function TimelineView({
           {phaseFilter !== "ALL" ? (
             <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
               <p className="text-xs text-muted">
-                Filtered to{" "}
-                <span className={cn("font-semibold", PHASE_STYLE[phaseFilter].chip, "rounded px-1.5 py-0.5")}>
-                  {PHASE_STYLE[phaseFilter].label}
+                {t("timeline.filteredTo")}{" "}
+                <span
+                  className={cn(
+                    "font-semibold",
+                    PHASE_STYLE[phaseFilter].chip,
+                    "rounded px-1.5 py-0.5",
+                  )}
+                >
+                  {t(PHASE_LABEL_KEY[phaseFilter])}
                 </span>
               </p>
               <button
@@ -318,7 +332,7 @@ export function TimelineView({
                 onClick={() => setPhaseFilter("ALL")}
                 className="text-xs font-semibold text-nav hover:text-nav-hover"
               >
-                Clear filter
+                {t("timeline.clearFilter")}
               </button>
             </div>
           ) : null}
@@ -327,13 +341,11 @@ export function TimelineView({
 
       {!nodes.length ? (
         <div className="surface-card px-4 py-10 text-center text-sm text-muted">
-          No nodes yet. Create structure in Focus Space or Tree to populate the
-          timeline.
+          {t("timeline.empty")}
         </div>
       ) : !filtered.length ? (
         <div className="surface-card px-4 py-10 text-center text-sm text-muted">
-          No nodes in this phase. Clear the filter or tag more nodes with a game
-          phase.
+          {t("timeline.emptyFiltered")}
         </div>
       ) : (
         <div className="relative">
@@ -369,7 +381,7 @@ export function TimelineView({
                           isToday ? "text-accent" : "text-muted",
                         )}
                       >
-                        {group.date.toLocaleDateString(undefined, {
+                        {group.date.toLocaleDateString(locale, {
                           month: "short",
                           day: "numeric",
                         })}
@@ -409,11 +421,11 @@ export function TimelineView({
                       <span className="text-xs font-semibold sm:text-sm">
                         <span className="sm:hidden">{group.label}</span>
                         <span className="hidden sm:inline">
-                          {isToday ? "Today" : group.label}
+                          {isToday ? t("timeline.today") : group.label}
                         </span>
                         <span className="ml-2 text-[10px] font-normal text-muted">
-                          {eventCount} event{eventCount === 1 ? "" : "s"}
-                          {!expanded ? " · collapsed" : ""}
+                          {t("timeline.events", { count: eventCount })}
+                          {!expanded ? ` ${t("timeline.collapsed")}` : ""}
                         </span>
                       </span>
                     </button>
@@ -435,7 +447,7 @@ export function TimelineView({
                               <div className="flex min-w-0 flex-1 items-center gap-3 py-1">
                                 <div className="h-px flex-1 bg-gradient-to-r from-accent/70 to-transparent" />
                                 <p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
-                                  Today
+                                  {t("timeline.today")}
                                 </p>
                                 <div className="h-px w-8 bg-accent/40" />
                               </div>
@@ -456,7 +468,7 @@ export function TimelineView({
                           >
                             <div className="hidden w-24 shrink-0 pt-3 text-right sm:block">
                               <p className="text-[11px] tabular-nums text-muted">
-                                {formatTime(at)}
+                                {formatTime(at, locale)}
                               </p>
                             </div>
 
@@ -491,24 +503,24 @@ export function TimelineView({
                                   <div className="flex flex-wrap items-center gap-2">
                                     {isAct ? (
                                       <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-nav bg-[var(--nav-muted)]">
-                                        Milestone · Act
+                                        {t("timeline.milestoneAct")}
                                       </span>
                                     ) : null}
-                                    {phaseStyle ? (
+                                    {phaseStyle && phase ? (
                                       <span
                                         className={cn(
                                           "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                                           phaseStyle.chip,
                                         )}
                                       >
-                                        {phaseStyle.label}
+                                        {t(PHASE_LABEL_KEY[phase])}
                                       </span>
                                     ) : null}
                                     <span className="text-[10px] uppercase tracking-wide text-muted">
                                       {node.type.replaceAll("_", " ")}
                                     </span>
                                     <span className="text-[10px] tabular-nums text-muted sm:hidden">
-                                      {formatTime(at)}
+                                      {formatTime(at, locale)}
                                     </span>
                                   </div>
                                   <Link
@@ -522,22 +534,24 @@ export function TimelineView({
                               </div>
                               <p className="mt-2 text-[11px] text-muted">
                                 {sortKey === "updatedAt"
-                                  ? "Updated"
-                                  : "Created"}{" "}
-                                {at.toLocaleString()}
+                                  ? t("timeline.updated")
+                                  : t("timeline.created")}{" "}
+                                {at.toLocaleString(locale)}
                                 {sortKey === "updatedAt" ? (
                                   <>
-                                    {" · "}Created{" "}
-                                    {toDate(
-                                      node.createdAt,
-                                    ).toLocaleDateString()}
+                                    {" · "}
+                                    {t("timeline.created")}{" "}
+                                    {toDate(node.createdAt).toLocaleDateString(
+                                      locale,
+                                    )}
                                   </>
                                 ) : (
                                   <>
-                                    {" · "}Updated{" "}
-                                    {toDate(
-                                      node.updatedAt,
-                                    ).toLocaleDateString()}
+                                    {" · "}
+                                    {t("timeline.updated")}{" "}
+                                    {toDate(node.updatedAt).toLocaleDateString(
+                                      locale,
+                                    )}
                                   </>
                                 )}
                               </p>
@@ -557,8 +571,10 @@ export function TimelineView({
                               className="text-xs font-semibold text-nav hover:text-nav-hover"
                             >
                               {showingAll
-                                ? "Show less"
-                                : `Show more (${hiddenCount})`}
+                                ? t("timeline.showLess")
+                                : t("timeline.showMore", {
+                                    count: hiddenCount,
+                                  })}
                             </button>
                           </div>
                         </li>

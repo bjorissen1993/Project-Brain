@@ -7,9 +7,11 @@ import {
   readLocalDisplayName,
   subscribeLocalDisplayName,
 } from "@/features/auth/local-profile";
+import { useLocale, useT } from "@/features/i18n";
 import { GenreEditor } from "@/features/projects/genre-editor";
 import { IntentEditor } from "@/features/projects/intent-editor";
 import { ProfileSection } from "@/features/projects/profile-section";
+import { GithubRepoSection } from "@/features/projects/github-repo-section";
 import { ProjectDeleteSection } from "@/features/projects/project-delete-section";
 import { ProjectExportSection } from "@/features/projects/project-export-section";
 import type { DesignFocus } from "@/types";
@@ -40,16 +42,6 @@ function condenseIntent(text: string, max = 220): string {
   return `${cleaned.slice(0, max).trimEnd()}…`;
 }
 
-function formatCreatedAt(value: string | Date): string {
-  const d = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export function ProjectProfile({
   projectId,
   projectName,
@@ -60,6 +52,7 @@ export function ProjectProfile({
   intentVersions,
   focusTree,
   focusOptions,
+  githubRepo = null,
 }: {
   projectId: string;
   projectName: string;
@@ -70,7 +63,10 @@ export function ProjectProfile({
   intentVersions: IntentVersion[];
   focusTree: DesignFocus[];
   focusOptions: { id: string; name: string }[];
+  githubRepo?: string | null;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const isGame = projectType === "GAME";
   const makerName = useSyncExternalStore(
     subscribeLocalDisplayName,
@@ -83,31 +79,38 @@ export function ProjectProfile({
   );
   const intentSummary = effectiveIntent
     ? condenseIntent(effectiveIntent)
-    : "No intent set yet — open Intent below to write what this project should become.";
+    : t("profile.noIntent");
 
   const genreNames = genres.map((g) => g.genre.name).filter(Boolean);
+
+  function formatCreatedAt(value: string | Date): string {
+    const d = typeof value === "string" ? new Date(value) : value;
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString(locale, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-8 px-6 py-8">
       <header className="max-w-prose">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
-          Project Profile
+          {t("profile.eyebrow")}
         </p>
         <h1 className="mt-1 font-display text-3xl">{projectName}</h1>
-        <p className="mt-2 text-sm text-muted">
-          Overview and settings for this project — intent, genres, Design Focus,
-          export, and delete.
-        </p>
+        <p className="mt-2 text-sm text-muted">{t("profile.overview")}</p>
       </header>
 
       <section
-        aria-label="Project basics"
+        aria-label={t("profile.basicsAria")}
         className="rounded-[var(--radius)] border border-border bg-panel/90 px-5 py-5 shadow-sm"
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 max-w-3xl">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
-              Basics
+              {t("profile.basics")}
             </p>
             <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
               {projectName}
@@ -129,14 +132,14 @@ export function ProjectProfile({
             ) : null}
             {isGame && customGameType?.trim() ? (
               <p className="mt-2 text-xs text-muted">
-                Custom type: {customGameType.trim()}
+                {t("profile.customType", { label: customGameType.trim() })}
               </p>
             ) : null}
           </div>
           <dl className="shrink-0 space-y-2 text-sm">
             <div>
               <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Created
+                {t("profile.created")}
               </dt>
               <dd className="mt-0.5 text-foreground">
                 {formatCreatedAt(createdAt)}
@@ -144,7 +147,7 @@ export function ProjectProfile({
             </div>
             <div>
               <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Created by
+                {t("profile.createdBy")}
               </dt>
               <dd className="mt-0.5 text-foreground">{makerName}</dd>
             </div>
@@ -155,8 +158,8 @@ export function ProjectProfile({
       <div className="grid gap-8 border-t border-border pt-8 lg:grid-cols-2 lg:items-start">
         <ProfileSection
           id="intent"
-          title="Intent"
-          description="Effective intent, amendments, and version history."
+          title={t("profile.intent")}
+          description={t("profile.intentDesc")}
           defaultOpen={false}
         >
           <IntentEditor
@@ -169,8 +172,8 @@ export function ProjectProfile({
         {isGame ? (
           <ProfileSection
             id="genres"
-            title="Genres"
-            description="Primary and secondary genres. Changing them never silently overwrites your choice."
+            title={t("profile.genres")}
+            description={t("profile.genresDesc")}
             defaultOpen={false}
           >
             <GenreEditor
@@ -182,8 +185,8 @@ export function ProjectProfile({
         ) : (
           <ProfileSection
             id="design-focus"
-            title="Design Focus"
-            description="Importance sliders for analysis criteria. Separate from Project Structure."
+            title={t("profile.designFocus")}
+            description={t("profile.designFocusDesc")}
             defaultOpen={false}
           >
             <DesignFocusEditor
@@ -199,8 +202,8 @@ export function ProjectProfile({
       {isGame ? (
         <ProfileSection
           id="design-focus"
-          title="Design Focus"
-          description="Importance sliders grouped by genre. Separate from Project Structure."
+          title={t("profile.designFocus")}
+          description={t("profile.designFocusDescGame")}
           defaultOpen={false}
           className="border-t border-border pt-8"
         >
@@ -212,6 +215,8 @@ export function ProjectProfile({
           />
         </ProfileSection>
       ) : null}
+
+      <GithubRepoSection projectId={projectId} githubRepo={githubRepo} />
 
       <div className="grid gap-8 border-t border-border pt-8 lg:grid-cols-2 lg:items-start">
         <ProjectExportSection projectId={projectId} />

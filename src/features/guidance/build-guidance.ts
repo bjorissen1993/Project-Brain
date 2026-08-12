@@ -1,4 +1,5 @@
 import { structureFocusHref } from "@/features/focus-space/structure-href";
+import type { MessageKey, TranslateVars } from "@/features/i18n/messages";
 import { isNodeContentEmpty } from "@/features/nodes/node-empty";
 import type { NodeStatus, NodeType } from "@/types";
 
@@ -12,7 +13,8 @@ export type GuidanceOpportunity = {
   id: string;
   kind: GuidanceKind;
   title: string;
-  softText: string;
+  softTextKey: MessageKey;
+  softTextVars?: TranslateVars;
   href: string;
   nodeId: string | null;
   rank: number;
@@ -76,6 +78,12 @@ function collectSubtreeIds(
   return ids;
 }
 
+type EmptyLeafGroup = {
+  parentId: string | null;
+  leaves: GuidanceNode[];
+  latestUpdate: number;
+};
+
 /**
  * Deterministic next-action opportunities for the project Guidance dashboard.
  * No OpenAI — pure signals from stored project data.
@@ -122,26 +130,93 @@ export function buildGuidanceOpportunities(input: {
       id: `continue-${n.id}`,
       kind: "continue",
       title: n.name,
-      softText: `You could continue working on “${n.name}”.`,
+      softTextKey: "guidance.softContinue",
+      softTextVars: { name: n.name },
       href: nodeHref(projectId, n.id),
       nodeId: n.id,
       rank: 10 + (n.status === "IN_PROGRESS" ? 0 : 1),
     });
   }
 
-  // 2) Empty content (named nodes) → Fill in
-  const emptyContent = nodes
-    .filter((n) => isNodeContentEmpty(n.content))
+  // 2) Empty leaf notes → one Fill-in card per parent (not per note)
+  const emptyLeaves = nodes.filter(
+    (n) => isNodeContentEmpty(n.content) && n.childCount === 0,
+  );
+  const leafGroups = new Map<string | null, EmptyLeafGroup>();
+  for (const leaf of emptyLeaves) {
+    const key = leaf.parentId;
+    const existing = leafGroups.get(key);
+    const ts = leaf.updatedAt.getTime();
+    if (existing) {
+      existing.leaves.push(leaf);
+      if (ts > existing.latestUpdate) existing.latestUpdate = ts;
+    } else {
+      leafGroups.set(key, {
+        parentId: key,
+        leaves: [leaf],
+        latestUpdate: ts,
+      });
+    }
+  }
+
+  const fillParentsHandled = new Set<string>();
+  const sortedLeafGroups = [...leafGroups.values()].sort(
+    (a, b) => b.latestUpdate - a.latestUpdate,
+  );
+
+  for (const group of sortedLeafGroups.slice(0, 6)) {
+    const count = group.leaves.length;
+    if (group.parentId) {
+      const parent = byId.get(group.parentId);
+      if (!parent) continue;
+      fillParentsHandled.add(parent.id);
+      push({
+        id: `fill-under-${parent.id}`,
+        kind: "fill_in",
+        title: parent.name,
+        softTextKey: "guidance.softFillInUnder",
+        softTextVars: { name: parent.name, count },
+        href: structureHref(projectId, parent.id),
+        nodeId: parent.id,
+        rank: 20,
+      });
+      continue;
+    }
+
+    // Root-level empty leaves → one project / focus-scoped card
+    const title = focusNode?.name ?? "Project";
+    const targetId = focusNode?.id ?? null;
+    push({
+      id: targetId ? `fill-under-${targetId}` : "fill-root",
+      kind: "fill_in",
+      title,
+      softTextKey: "guidance.softFillInUnder",
+      softTextVars: { name: title, count },
+      href: structureHref(projectId, targetId),
+      nodeId: targetId,
+      rank: 20,
+    });
+  }
+
+  // Empty containers with no empty leaf children still get a single Fill-in
+  const emptyContainers = nodes
+    .filter(
+      (n) =>
+        isNodeContentEmpty(n.content) &&
+        n.childCount > 0 &&
+        !fillParentsHandled.has(n.id),
+    )
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-  for (const n of emptyContent.slice(0, 6)) {
+  for (const n of emptyContainers.slice(0, 3)) {
     push({
       id: `fill-${n.id}`,
       kind: "fill_in",
       title: n.name,
-      softText: `You could fill in notes for “${n.name}”.`,
-      href: nodeHref(projectId, n.id),
+      softTextKey: "guidance.softFillIn",
+      softTextVars: { name: n.name },
+      href: structureHref(projectId, n.id),
       nodeId: n.id,
-      rank: 20,
+      rank: 21,
     });
   }
 
@@ -154,7 +229,8 @@ export function buildGuidanceOpportunities(input: {
       id: `review-${p.id}`,
       kind: "review",
       title: label,
-      softText: `You could review structure suggestions for “${label}”.`,
+      softTextKey: "guidance.softReview",
+      softTextVars: { name: label },
       href: nodeHref(projectId, p.nodeId),
       nodeId: p.nodeId,
       rank: 5,
@@ -175,7 +251,8 @@ export function buildGuidanceOpportunities(input: {
       id: `structure-${n.id}`,
       kind: "continue_structure",
       title: n.name,
-      softText: `You could continue structuring “${n.name}”.`,
+      softTextKey: "guidance.softContinueStructure",
+      softTextVars: { name: n.name },
       href: structureHref(projectId, n.id),
       nodeId: n.id,
       rank: 15,
@@ -188,7 +265,7 @@ export function buildGuidanceOpportunities(input: {
       id: "continue-root",
       kind: "continue",
       title: "Project structure",
-      softText: "You could start exploring the Structure workspace.",
+      softTextKey: "guidance.softExploreStructure",
       href: structureHref(projectId, null),
       nodeId: null,
       rank: 1,
@@ -198,7 +275,8 @@ export function buildGuidanceOpportunities(input: {
       id: `continue-focus-${focusNode.id}`,
       kind: "continue_structure",
       title: focusNode.name,
-      softText: `You could start structuring “${focusNode.name}”.`,
+      softTextKey: "guidance.softStartStructuring",
+      softTextVars: { name: focusNode.name },
       href: structureHref(projectId, focusNode.id),
       nodeId: focusNode.id,
       rank: 2,
@@ -210,4 +288,4 @@ export function buildGuidanceOpportunities(input: {
   );
 }
 
-export const GUIDANCE_VISIBLE = 4;
+export const GUIDANCE_VISIBLE = 3;

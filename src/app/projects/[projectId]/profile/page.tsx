@@ -20,6 +20,7 @@ export default async function ProjectProfilePage({
       projectName={project.name}
       projectType={project.type}
       createdAt={project.createdAt}
+      githubRepo={project.githubRepo}
       genres={project.genres.map((row) => ({
         role: row.role,
         genre: {

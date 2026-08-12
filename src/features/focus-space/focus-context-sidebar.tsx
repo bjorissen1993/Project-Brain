@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -17,8 +18,12 @@ import {
   type ScoredRelation,
 } from "./relation-strength";
 import { FocusRelationsControl } from "./focus-relations-control";
-import { parseStructureView } from "./structure-href";
+import {
+  BLOB_VIEW_MAX_CHILDREN,
+  parseStructureView,
+} from "./structure-href";
 import { StructureViewSwitcher } from "./structure-view-switcher";
+import { useT, type MessageKey } from "@/features/i18n";
 
 function StructureViewSwitcherSlot({
   projectId,
@@ -29,11 +34,20 @@ function StructureViewSwitcherSlot({
 }) {
   const searchParams = useSearchParams();
   const view = parseStructureView(searchParams.get("view"));
+  const workspace = useOptionalFocusWorkspace();
+  // Same count Blobs would render: direct children under the current focus parent.
+  const blobChildCount = workspace
+    ? workspace.structureLevelFor(nodeId).slices.length
+    : 0;
+  const blobsDisabled = blobChildCount > BLOB_VIEW_MAX_CHILDREN;
+
   return (
     <StructureViewSwitcher
       projectId={projectId}
       nodeId={nodeId}
-      view={view}
+      view={blobsDisabled && view === "blobs" ? "tree" : view}
+      blobsDisabled={blobsDisabled}
+      blobChildCount={blobChildCount}
     />
   );
 }
@@ -91,16 +105,21 @@ function StatusDistribution({
     total: number;
   };
 }) {
+  const t = useT();
   if (counts.total === 0) {
-    return <p className="text-xs text-muted">No contained components yet.</p>;
+    return <p className="text-xs text-muted">{t("focusSpace.noContained")}</p>;
   }
 
   const rows = [
-    { label: "Ready", value: counts.ready, color: "var(--ready)" },
-    { label: "In progress", value: counts.inProgress, color: "var(--in-progress)" },
-    { label: "Review", value: counts.review, color: "var(--review)" },
-    { label: "Draft", value: counts.draft, color: "var(--draft)" },
-    { label: "Idea", value: counts.idea, color: "var(--idea)" },
+    { label: t("status.ready"), value: counts.ready, color: "var(--ready)" },
+    {
+      label: t("status.inProgress"),
+      value: counts.inProgress,
+      color: "var(--in-progress)",
+    },
+    { label: t("status.review"), value: counts.review, color: "var(--review)" },
+    { label: t("status.draft"), value: counts.draft, color: "var(--draft)" },
+    { label: t("status.idea"), value: counts.idea, color: "var(--idea)" },
   ].filter((r) => r.value > 0);
 
   return (
@@ -129,30 +148,30 @@ function weightFromMetadata(metadata: unknown): number {
   return typeof w === "number" && Number.isFinite(w) ? w : 0;
 }
 
-function signalRows(rel: ScoredRelation) {
+function signalRows(rel: ScoredRelation, t: (key: MessageKey) => string) {
   return (
     [
       {
         key: "explicit",
-        label: "Explicit relation",
+        label: t("focusSpace.explicitRelation"),
         value: rel.signals.explicit,
         max: RELATION_WEIGHTS.explicit,
       },
       {
         key: "shared",
-        label: "Shared Design Focus",
+        label: t("focusSpace.sharedDesignFocus"),
         value: rel.signals.sharedClassification,
         max: RELATION_WEIGHTS.sharedClassification,
       },
       {
         key: "structural",
-        label: "Structural proximity",
+        label: t("focusSpace.structuralProximity"),
         value: rel.signals.structural,
         max: RELATION_WEIGHTS.structural,
       },
       {
         key: "ai",
-        label: "AI evidence",
+        label: t("focusSpace.aiEvidence"),
         value: rel.signals.aiEvidence,
         max: RELATION_WEIGHTS.aiEvidence,
       },
@@ -167,8 +186,12 @@ function ConnectionsSection({
   focusId: string | null;
   kind: RouteKind;
 }) {
+  const t = useT();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const workspace = useOptionalFocusWorkspace();
+  const structureView = parseStructureView(searchParams.get("view"));
+  const isTreeView = structureView === "tree";
 
   const data = useMemo(() => {
     if (!workspace || kind !== "structure") return null;
@@ -214,9 +237,8 @@ function ConnectionsSection({
 
   const focusOther = (otherId: string) => {
     workspace.setRelationFocusId(otherId);
-    workspace.setHoveredId(otherId, "chart");
     if (visibleIds.includes(otherId)) {
-      // Stay on this level — soft-focus the sibling for Focused mode.
+      // Stay on this level — soft-focus the sibling for the Connections list.
       return;
     }
     router.push(`/projects/${projectId}/focus/${otherId}`);
@@ -225,18 +247,22 @@ function ConnectionsSection({
   return (
     <div className="rounded-[var(--radius)] border border-border bg-panel px-3 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-        Connections
+        {t("focusSpace.connections")}
       </p>
       <p className="mt-1 text-[10px] text-muted">
         {anchorName
-          ? `Sorted by strength for ${anchorName}`
-          : "Hover a blob to inspect its connections — scores from stored signals only"}
+          ? t("focusSpace.sortedFor", { name: anchorName })
+          : isTreeView
+            ? t("focusSpace.hoverTreeChild")
+            : t("focusSpace.hoverBlob")}
       </p>
       {list.length === 0 ? (
         <p className="mt-2 text-xs text-muted">
           {anchor
-            ? "No visible relations above the threshold for this blob."
-            : "No relations above the visibility threshold at this level."}
+            ? isTreeView
+              ? t("focusSpace.noRelationsAnchorTree")
+              : t("focusSpace.noRelationsAnchor")
+            : t("focusSpace.noRelations")}
         </p>
       ) : (
         <ul className="mt-2 space-y-2">
@@ -251,19 +277,13 @@ function ConnectionsSection({
               anchor == null
                 ? `${namesById.get(rel.sourceId) ?? "?"} ↔ ${namesById.get(rel.targetId) ?? "?"}`
                 : namesById.get(otherId) ?? otherId;
-            const signals = signalRows(rel);
+            const signals = signalRows(rel, t);
             return (
               <li key={rel.key}>
                 <button
                   type="button"
-                  className="w-full rounded-[var(--radius)] px-1.5 py-1.5 text-left transition-colors hover:bg-panel-elevated"
+                  className="w-full rounded-[var(--radius)] px-1.5 py-1.5 text-left"
                   onClick={() => focusOther(otherId)}
-                  onMouseEnter={() => {
-                    if (visibleIds.includes(otherId)) {
-                      workspace.setHoveredId(otherId, "chart");
-                    }
-                  }}
-                  onMouseLeave={() => workspace.setHoveredId(null)}
                 >
                   <div className="flex items-center justify-between gap-2 text-xs">
                     <span className="truncate font-medium text-foreground">
@@ -378,15 +398,25 @@ export function FocusContextSidebar({
   focusId: string | null;
   kind: "structure" | "design-focus";
 }) {
+  const t = useT();
   const router = useRouter();
   const workspace = useOptionalFocusWorkspace();
   const contributions = useDesignFocusContribution(focusId, kind);
+  const [legendExpanded, setLegendExpanded] = useState(false);
+  const legendLevelKey = `${kind}:${focusId ?? "root"}`;
+  const [syncedLegendLevelKey, setSyncedLegendLevelKey] =
+    useState(legendLevelKey);
+  if (syncedLegendLevelKey !== legendLevelKey) {
+    setSyncedLegendLevelKey(legendLevelKey);
+    setLegendExpanded(false);
+  }
   if (!workspace) return null;
 
   const {
     projectId,
     hoveredId,
     setHoveredId,
+    relationFocusId,
     structureLevelFor,
     designFocusLevelFor,
     observations,
@@ -416,9 +446,17 @@ export function FocusContextSidebar({
       ? focuses.find((f) => f.id === focusId)
       : null;
 
+  const legendFocusedId =
+    (hoveredId && level.slices.some((s) => s.id === hoveredId)
+      ? hoveredId
+      : null) ??
+    (relationFocusId && level.slices.some((s) => s.id === relationFocusId)
+      ? relationFocusId
+      : null);
+
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-4 py-3">
+      <div className="shrink-0 border-b border-border px-4 py-3">
         {kind === "structure" ? (
           <div className="space-y-2">
             <Suspense
@@ -438,36 +476,33 @@ export function FocusContextSidebar({
           </div>
         ) : (
           <>
-            <h2 className="text-sm font-semibold">Design Focus context</h2>
+            <h2 className="text-sm font-semibold">{t("focusSpace.designFocusContext")}</h2>
             <p className="mt-1 text-xs text-muted">
-              Composition of Design Focuses at this level
+              {t("focusSpace.designFocusComposition")}
             </p>
           </>
         )}
       </div>
 
-      <div className="scrollbar-thin flex-1 space-y-5 overflow-y-auto p-4">
+      {/* Level name + pie stay anchored; other sections scroll below. */}
+      <div className="shrink-0 border-b border-border bg-panel px-4 pb-3 pt-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Current
-          </p>
-          <p className="mt-1 font-display text-lg font-semibold leading-snug">
+          <p className="font-display text-lg font-semibold leading-snug">
             {level.name}
           </p>
           <p className="mt-1 text-xs text-muted">
-            {level.totalContainedNodes} contained component
-            {level.totalContainedNodes === 1 ? "" : "s"}
+            {t("focusSpace.containedComponent", { count: level.totalContainedNodes })}
           </p>
           {currentFocus ? (
             <p className="mt-2 text-xs text-muted">
-              Target importance:{" "}
+              {t("focusSpace.targetImportance")}{" "}
               <span className="font-medium text-foreground">
                 {currentFocus.targetImportance}
               </span>
               {currentFocus.actualWeight > 0 ? (
                 <>
                   {" · "}
-                  Actual:{" "}
+                  {t("focusSpace.actual")}{" "}
                   <span className="font-medium text-foreground">
                     {currentFocus.actualWeight}
                   </span>
@@ -477,12 +512,7 @@ export function FocusContextSidebar({
           ) : null}
         </div>
 
-        <ConnectionsSection focusId={focusId} kind={kind} />
-
-        <div>
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Composition
-          </p>
+        <div className="mt-4">
           <FocusCompositionPie
             slices={level.slices}
             hoveredId={hoveredId}
@@ -490,40 +520,77 @@ export function FocusContextSidebar({
             onSelect={navigateTo}
             colorFor={colorFor}
           />
-          <FocusCompositionLegend
-            slices={level.slices}
-            hoveredId={hoveredId}
-            onHover={(id) => setHoveredId(id, "chart")}
-            onSelect={navigateTo}
-            colorFor={colorFor}
-            onColorChange={setFocusColor}
-          />
+          {level.slices.length > 0 ? (
+            <div className="mt-2">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted transition-colors hover:text-foreground"
+                aria-expanded={legendExpanded}
+                onClick={() => setLegendExpanded((v) => !v)}
+              >
+                {legendExpanded ? (
+                  <ChevronDown size={14} strokeWidth={2} aria-hidden />
+                ) : (
+                  <ChevronRight size={14} strokeWidth={2} aria-hidden />
+                )}
+                {legendExpanded
+                  ? t("focusSpace.hideElements")
+                  : legendFocusedId
+                    ? t("focusSpace.elements")
+                    : t("focusSpace.elementsCount", { count: level.slices.length })}
+              </button>
+              <div
+                className={
+                  legendExpanded
+                    ? "max-h-[min(28vh,16rem)] overflow-y-auto overflow-x-hidden scrollbar-thin"
+                    : undefined
+                }
+              >
+                <FocusCompositionLegend
+                  slices={level.slices}
+                  hoveredId={hoveredId}
+                  focusedId={legendFocusedId}
+                  collapsed={!legendExpanded}
+                  onHover={(id) => setHoveredId(id, "chart")}
+                  onSelect={navigateTo}
+                  colorFor={colorFor}
+                  onColorChange={setFocusColor}
+                />
+              </div>
+            </div>
+          ) : null}
           {level.slices.length > 0 ? (
             <p className="mt-2 text-[10px] text-muted">
-              Weights:{" "}
+              {t("focusSpace.weights")}{" "}
               {kind === "structure"
                 ? level.weightSource === "nodeDistribution"
-                  ? "contained node distribution"
+                  ? t("focusSpace.weightNodeDist")
                   : level.weightSource === "subtreeMass"
-                    ? "subtree / content mass"
-                    : "equal split"
+                    ? t("focusSpace.weightSubtree")
+                    : t("focusSpace.weightEqual")
                 : level.weightSource === "actualWeight"
-                  ? "balance actualWeight"
+                  ? t("focusSpace.weightActual")
                   : level.weightSource === "nodeDistribution"
-                    ? "classification / node distribution"
+                    ? t("focusSpace.weightClassification")
                     : level.weightSource === "subtreeMass"
-                      ? "subtree / content mass"
-                      : "equal split"}
+                      ? t("focusSpace.weightSubtree")
+                      : t("focusSpace.weightEqual")}
               {" · "}
-              Click a color swatch to customize (double-click to reset)
+              {t("focusSpace.colorSwatchHint")}
             </p>
           ) : null}
         </div>
+      </div>
+
+      <div className="scrollbar-thin flex-1 space-y-5 overflow-y-auto p-4">
+        <Suspense fallback={null}>
+          <ConnectionsSection focusId={focusId} kind={kind} />
+        </Suspense>
 
         {kind === "design-focus" && level.slices.length > 0 ? (
           <div className="rounded-[var(--radius)] border border-border bg-panel px-3 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Target importance (siblings)
+              {t("focusSpace.targetImportanceSiblings")}
             </p>
             <ul className="mt-2 space-y-1.5">
               {level.slices.map((slice) => {
@@ -546,7 +613,7 @@ export function FocusContextSidebar({
 
         <div className="rounded-[var(--radius)] border border-border bg-panel px-3 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Status distribution
+            {t("focusSpace.statusDistribution")}
           </p>
           <div className="mt-2">
             <StatusDistribution counts={level.statusCounts} />
@@ -556,15 +623,14 @@ export function FocusContextSidebar({
         {kind === "structure" ? (
           <div className="rounded-[var(--radius)] border border-border bg-panel px-3 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Design Focus contribution
+              {t("focusSpace.designFocusContribution")}
             </p>
             <p className="mt-1 text-[10px] text-muted">
-              Classifications of Ready nodes inside this container — does not
-              change structure blobs.
+              {t("focusSpace.contributionHelp")}
             </p>
             {contributions.length === 0 ? (
               <p className="mt-2 text-xs text-muted">
-                No Ready classifications under this level yet.
+                {t("focusSpace.noReadyClassifications")}
               </p>
             ) : (
               <ul className="mt-2 space-y-1.5">
@@ -589,7 +655,7 @@ export function FocusContextSidebar({
         (level.balanceStatus || level.balanceDirection) ? (
           <div className="rounded-[var(--radius)] border border-border bg-panel px-3 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Balance
+              {t("focusSpace.balance")}
             </p>
             <p
               className={cn(
@@ -597,7 +663,13 @@ export function FocusContextSidebar({
                 balanceTone(level.balanceStatus),
               )}
             >
-              {level.balanceStatus ?? "neutral"}
+              {level.balanceStatus === "green"
+                ? t("balance.green")
+                : level.balanceStatus === "orange"
+                  ? t("balance.orange")
+                  : level.balanceStatus === "red"
+                    ? t("balance.red")
+                    : t("balance.neutral")}
             </p>
             {level.balanceDirection ? (
               <p className="mt-1 text-xs text-muted">{level.balanceDirection}</p>
@@ -608,7 +680,7 @@ export function FocusContextSidebar({
         {observations.length > 0 ? (
           <div className="rounded-[var(--radius)] border border-border bg-panel px-3 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Design observations
+              {t("focusSpace.designObservations")}
             </p>
             <ul className="mt-2 space-y-2">
               {observations.map((obs, i) => (

@@ -55,6 +55,7 @@ export async function createRelationAction(raw: unknown) {
 
     revalidatePath(`/projects/${data.projectId}`);
     revalidatePath(`/projects/${data.projectId}/focus`);
+    revalidatePath(`/projects/${data.projectId}/graph`);
     revalidatePath(`/projects/${data.projectId}/nodes/${data.sourceNodeId}`);
     revalidatePath(`/projects/${data.projectId}/nodes/${data.targetNodeId}`);
     return { ok: true as const, relation };
@@ -74,6 +75,7 @@ export async function deleteRelationAction(id: string) {
 
   await prisma.nodeRelation.delete({ where: { id } });
   revalidatePath(`/projects/${existing.projectId}`);
+  revalidatePath(`/projects/${existing.projectId}/graph`);
   revalidatePath(`/projects/${existing.projectId}/nodes/${existing.sourceNodeId}`);
   revalidatePath(`/projects/${existing.projectId}/nodes/${existing.targetNodeId}`);
   return { ok: true as const };

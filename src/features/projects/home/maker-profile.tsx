@@ -1,23 +1,41 @@
 "use client";
 
+import Link from "next/link";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, Settings } from "lucide-react";
 import {
-  AUTH_SIGN_IN_OPTIONS,
   DEFAULT_LOCAL_DISPLAY_NAME,
   initialsFromDisplayName,
   readLocalDisplayName,
   subscribeLocalDisplayName,
   writeLocalDisplayName,
 } from "@/features/auth";
+import { useT } from "@/features/i18n";
 import { cn } from "@/lib/utils";
 
-export function MakerProfile({ className }: { className?: string }) {
+type ProviderId = "github" | "google";
+
+export function MakerProfile({
+  className,
+  authEnabled = false,
+  googleAvailable = false,
+  githubAvailable = false,
+  linkedProviders = [],
+}: {
+  className?: string;
+  authEnabled?: boolean;
+  googleAvailable?: boolean;
+  githubAvailable?: boolean;
+  linkedProviders?: ProviderId[];
+}) {
+  const t = useT();
   const inputId = useId();
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const name = useSyncExternalStore(
+  const { data: session, status } = useSession();
+  const localName = useSyncExternalStore(
     subscribeLocalDisplayName,
     readLocalDisplayName,
     () => DEFAULT_LOCAL_DISPLAY_NAME,
@@ -25,6 +43,19 @@ export function MakerProfile({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(DEFAULT_LOCAL_DISPLAY_NAME);
+  const [authPending, setAuthPending] = useState<ProviderId | "signout" | null>(
+    null,
+  );
+
+  const authenticated = authEnabled && status === "authenticated" && session?.user;
+  const name = authenticated
+    ? session.user.name?.trim() ||
+      session.user.email?.trim() ||
+      localName
+    : localName;
+  const email = authenticated ? session.user.email : null;
+  const image = authenticated ? session.user.image : null;
+  const linked = new Set(linkedProviders);
 
   useEffect(() => {
     if (!open) return;
@@ -49,6 +80,7 @@ export function MakerProfile({ className }: { className?: string }) {
   }, [open]);
 
   function startEditing() {
+    if (authenticated) return;
     setDraft(name);
     setEditing(true);
     queueMicrotask(() => inputRef.current?.focus());
@@ -61,7 +93,37 @@ export function MakerProfile({ className }: { className?: string }) {
     setEditing(false);
   }
 
+  async function onSignIn(provider: ProviderId) {
+    setAuthPending(provider);
+    try {
+      await signIn(provider, { callbackUrl: window.location.href });
+    } finally {
+      setAuthPending(null);
+    }
+  }
+
+  async function onSignOut() {
+    setAuthPending("signout");
+    try {
+      await signOut({ callbackUrl: "/login" });
+    } finally {
+      setAuthPending(null);
+    }
+  }
+
   const initials = initialsFromDisplayName(name);
+  const options: { id: ProviderId; label: string; available: boolean }[] = [
+    {
+      id: "github",
+      label: t("landing.continueGithub"),
+      available: githubAvailable,
+    },
+    {
+      id: "google",
+      label: t("landing.continueGoogle"),
+      available: googleAvailable,
+    },
+  ];
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
@@ -73,15 +135,24 @@ export function MakerProfile({ className }: { className?: string }) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-panel/80 px-3 py-2 backdrop-blur-sm transition hover:border-border-strong hover:bg-panel"
       >
-        <span
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-nav-muted text-xs font-bold tracking-wide text-nav"
-          aria-hidden
-        >
-          {initials}
-        </span>
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt=""
+            className="h-9 w-9 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-nav-muted text-xs font-bold tracking-wide text-nav"
+            aria-hidden
+          >
+            {initials}
+          </span>
+        )}
         <div className="min-w-0 text-left">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
-            Your workspace
+            {t("landing.yourWorkspace")}
           </p>
           <p className="mt-0.5 max-w-[12rem] truncate text-sm font-semibold text-foreground">
             {name}
@@ -100,21 +171,30 @@ export function MakerProfile({ className }: { className?: string }) {
         <div
           id={panelId}
           role="dialog"
-          aria-label="Profile"
+          aria-label={t("nav.profile")}
           className="absolute right-0 z-40 mt-1.5 w-[17.5rem] overflow-hidden rounded-[var(--radius)] border border-border-strong bg-[#1a1a1a] shadow-lg"
         >
           <div className="flex items-center gap-3 border-b border-border px-3.5 py-3">
-            <span
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-nav-muted text-sm font-bold tracking-wide text-nav"
-              aria-hidden
-            >
-              {initials}
-            </span>
+            {image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={image}
+                alt=""
+                className="h-11 w-11 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-nav-muted text-sm font-bold tracking-wide text-nav"
+                aria-hidden
+              >
+                {initials}
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
-                Display name
+                {authenticated ? t("landing.signedInAs") : t("landing.displayName")}
               </p>
-              {editing ? (
+              {editing && !authenticated ? (
                 <form
                   className="mt-1"
                   onSubmit={(e) => {
@@ -123,7 +203,7 @@ export function MakerProfile({ className }: { className?: string }) {
                   }}
                 >
                   <label htmlFor={inputId} className="sr-only">
-                    Display name
+                    {t("landing.displayName")}
                   </label>
                   <input
                     ref={inputRef}
@@ -147,52 +227,122 @@ export function MakerProfile({ className }: { className?: string }) {
                   type="button"
                   onClick={startEditing}
                   className="mt-0.5 block w-full truncate text-left text-sm font-semibold text-foreground hover:text-nav"
-                  title="Edit display name"
+                  title={
+                    authenticated
+                      ? undefined
+                      : t("landing.editDisplayName")
+                  }
                 >
                   {name}
                 </button>
               )}
-              <p className="mt-1 text-[11px] text-muted">Local workspace · not signed in</p>
+              <p className="mt-1 truncate text-[11px] text-muted">
+                {authenticated
+                  ? email || t("landing.signedInWorkspace")
+                  : t("landing.localWorkspace")}
+              </p>
             </div>
           </div>
 
-          <div className="px-3.5 py-3">
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
-              Sign in
-            </p>
-            <div className="space-y-1.5">
-              {AUTH_SIGN_IN_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  disabled
-                  title="Coming soon"
-                  className="flex w-full items-center justify-between gap-2 rounded-[var(--radius)] border border-border bg-panel/60 px-3 py-2 text-left text-[13px] text-muted opacity-70"
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <ProviderGlyph provider={option.id} />
-                    <span>{option.label}</span>
-                  </span>
-                  <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted">
-                    Soon
-                  </span>
-                </button>
-              ))}
-            </div>
+          <div className="border-b border-border px-2 py-1.5">
+            <Link
+              href="/settings"
+              onClick={() => {
+                setOpen(false);
+                setEditing(false);
+              }}
+              className="flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-[13px] text-foreground transition hover:bg-panel hover:text-nav"
+            >
+              <Settings className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>{t("landing.profileSettings")}</span>
+            </Link>
           </div>
+
+          {authEnabled ? (
+            <div className="px-3.5 py-3">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
+                {authenticated ? t("landing.linkAccounts") : t("landing.signIn")}
+              </p>
+              <div className="space-y-1.5">
+                {options.map((option) => {
+                  const isLinked = linked.has(option.id);
+                  const disabled =
+                    !option.available ||
+                    authPending !== null ||
+                    (authenticated && isLinked);
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      disabled={disabled}
+                      title={
+                        !option.available
+                          ? t("landing.providerNotConfigured")
+                          : isLinked
+                            ? t("landing.providerLinked")
+                            : undefined
+                      }
+                      onClick={() => onSignIn(option.id)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-2 rounded-[var(--radius)] border px-3 py-2 text-left text-[13px] transition",
+                        disabled
+                          ? "border-border bg-panel/60 text-muted opacity-70"
+                          : "border-border bg-panel/60 text-foreground hover:border-nav hover:bg-panel",
+                      )}
+                    >
+                      <span className="inline-flex items-center gap-2.5">
+                        <ProviderGlyph provider={option.id} />
+                        <span>{option.label}</span>
+                      </span>
+                      {isLinked ? (
+                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-nav">
+                          {t("landing.linked")}
+                        </span>
+                      ) : authPending === option.id ? (
+                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted">
+                          …
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 px-3.5 py-3">
+              <p className="text-[11px] text-muted">
+                {t("landing.authDisabledHint")}
+              </p>
+              <Link
+                href="/login"
+                onClick={() => {
+                  setOpen(false);
+                  setEditing(false);
+                }}
+                className="inline-flex text-[12px] font-medium text-nav transition hover:underline"
+              >
+                {t("landing.signIn")}
+              </Link>
+            </div>
+          )}
 
           <div className="border-t border-border px-2 py-1.5">
             <button
               type="button"
-              disabled
-              title="Coming soon — no account session yet"
-              className="flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-[13px] text-muted opacity-60"
+              disabled={!authenticated || authPending !== null}
+              onClick={onSignOut}
+              title={
+                authenticated ? undefined : t("landing.signOutNeedsSession")
+              }
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-[13px] transition",
+                authenticated
+                  ? "text-foreground hover:bg-panel hover:text-nav"
+                  : "text-muted opacity-60",
+              )}
             >
               <LogOut className="h-3.5 w-3.5" aria-hidden />
-              <span>Sign out</span>
-              <span className="ml-auto text-[10px] font-medium uppercase tracking-wide">
-                Soon
-              </span>
+              <span>{t("landing.signOut")}</span>
             </button>
           </div>
         </div>
@@ -201,7 +351,7 @@ export function MakerProfile({ className }: { className?: string }) {
   );
 }
 
-function ProviderGlyph({ provider }: { provider: "github" | "google" }) {
+function ProviderGlyph({ provider }: { provider: ProviderId }) {
   if (provider === "github") {
     return (
       <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden fill="currentColor">

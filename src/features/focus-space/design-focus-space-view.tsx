@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { ArrowUp } from "lucide-react";
+import { ContextMenu } from "@/components/ui/context-menu";
 import { updateDesignFocusAction } from "@/features/design-focus/actions";
 import { AddFocusBlobControl } from "./add-focus-blob-control";
 import { FocusBlobPropertiesDialog } from "./focus-blob-properties-dialog";
@@ -11,12 +12,15 @@ import { FocusBlobs } from "./focus-blobs";
 import { FocusIdeaEditor } from "./focus-idea-editor";
 import { useFocusWorkspace } from "./focus-interaction-context";
 import { buildFocusLevelSummaryCopy } from "./focus-level-copy";
+import { designFocusBlobMenuItems } from "./structure-context-menu";
+import { useT } from "@/features/i18n";
 
 /**
  * Design Focus view — blobs are Design Focuses (emphasis criteria).
  * Separate from Project Structure Focus Space.
  */
 export function DesignFocusSpaceView({ focusId }: { focusId: string | null }) {
+  const t = useT();
   const router = useRouter();
   const {
     projectId,
@@ -35,6 +39,11 @@ export function DesignFocusSpaceView({ focusId }: { focusId: string | null }) {
   const [propertiesFocusId, setPropertiesFocusId] = useState<string | null>(
     null,
   );
+  const [menu, setMenu] = useState<{
+    focusId: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const navigateTo = (id: string) => {
     router.push(`/projects/${projectId}/design-focus/${id}`);
@@ -95,7 +104,7 @@ export function DesignFocusSpaceView({ focusId }: { focusId: string | null }) {
         <div className="flex items-start justify-between gap-6">
           <div className="min-w-0">
             <nav
-              aria-label="Design Focus breadcrumb"
+              aria-label={t("focusSpace.breadcrumb")}
               className="flex flex-wrap items-center gap-1 text-xs text-muted"
             >
               {level.breadcrumb.map((crumb, i) => {
@@ -130,26 +139,24 @@ export function DesignFocusSpaceView({ focusId }: { focusId: string | null }) {
                 className="mt-2.5 inline-flex items-center gap-2 rounded-[var(--radius)] border border-nav/35 bg-nav-muted px-3 py-1.5 text-sm font-medium text-nav shadow-sm transition-colors hover:border-nav/55 hover:bg-nav/15 hover:text-nav-hover"
               >
                 <ArrowUp size={16} strokeWidth={2.25} aria-hidden />
-                Up one level
+                {t("focusSpace.upOneLevel")}
               </Link>
             ) : null}
           </div>
 
           <div className="max-w-md shrink-0 text-right">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
-              Design Focus
+              {t("designFocus.title")}
             </p>
             <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight sm:text-3xl">
               {level.name}
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              What is the project focusing on? Blobs are Design Focuses — not
-              Project Structure.{" "}
-              {level.slices.length > 0
-                ? "Drill in, adjust importance via properties, or add with +."
-                : focusId
-                  ? "Add child focuses with +, or review contributing ideas below."
-                  : "Add Design Focuses with + to map emphasis criteria."}
+              {focusId == null
+                ? t("focusSpace.focusRootHelp")
+                : level.slices.length > 0
+                  ? t("focusSpace.focusNestedHelp")
+                  : t("focusSpace.focusLeafHelp")}
             </p>
             <p className="mt-1.5 text-xs leading-relaxed text-muted/90">
               {contextCopy}
@@ -165,7 +172,9 @@ export function DesignFocusSpaceView({ focusId }: { focusId: string | null }) {
             hoverSource={hoverSource}
             onHover={(id) => setHoveredId(id, "blob")}
             onSelect={navigateTo}
-            onBlobContextMenu={(id) => setPropertiesFocusId(id)}
+            onBlobContextMenu={(id, x, y) => {
+              setMenu({ focusId: id, x, y });
+            }}
             projectId={projectId}
             levelFocusId={focusId}
             canExtract={canExtract}
@@ -188,19 +197,19 @@ export function DesignFocusSpaceView({ focusId }: { focusId: string | null }) {
 
         <div className="relative mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border/80 pt-4 text-xs text-muted">
           <span>
-            {level.slices.length} direct child
-            {level.slices.length === 1 ? "" : "ren"}
+            {t("focusSpace.directChild", { count: level.slices.length })}
             {level.totalContainedNodes > 0
-              ? ` · ${level.totalContainedNodes} contributing nodes`
+              ? ` ${t("focusSpace.contributingNodes", {
+                  count: level.totalContainedNodes,
+                })}`
               : ""}
-            {" · "}
-            target importance via properties
+            {` ${t("focusSpace.targetViaProperties")}`}
           </span>
           <Link
             href={`/projects/${projectId}/focus`}
             className="font-medium text-nav hover:text-nav-hover"
           >
-            Project Structure
+            {t("focusSpace.projectStructure")}
           </Link>
         </div>
       </div>
@@ -209,6 +218,19 @@ export function DesignFocusSpaceView({ focusId }: { focusId: string | null }) {
         <FocusBlobPropertiesDialog
           focusId={propertiesFocusId}
           onClose={() => setPropertiesFocusId(null)}
+        />
+      ) : null}
+
+      {menu ? (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={designFocusBlobMenuItems()}
+          onSelect={(action) => {
+            if (action === "open") navigateTo(menu.focusId);
+            if (action === "edit") setPropertiesFocusId(menu.focusId);
+          }}
+          onClose={() => setMenu(null)}
         />
       ) : null}
     </div>

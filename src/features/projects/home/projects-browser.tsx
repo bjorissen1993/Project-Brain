@@ -1,8 +1,10 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/features/i18n";
 import type { HomeProjectItem } from "@/features/projects/actions";
 import { FavoriteToggle } from "./favorite-toggle";
 import { StructurePreview } from "./structure-preview";
@@ -53,6 +55,17 @@ function ProjectMark({
 const LIST_ROW =
   "flex w-full items-center gap-2.5 rounded-[var(--radius)] px-2.5 py-1.5 text-sm";
 
+/** Grid cell wrapper so create + project cards share the same stretched footprint. */
+function BrowserCell({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <li className={cn("flex min-w-0", className)}>{children}</li>;
+}
+
 function CreateTile({
   mode,
   className,
@@ -60,6 +73,7 @@ function CreateTile({
   mode: ProjectViewMode;
   className?: string;
 }) {
+  const t = useT();
   const listLike = mode === "list" || mode === "details";
   const contentLike = mode === "content";
   const tilesLike = mode === "tiles";
@@ -69,12 +83,12 @@ function CreateTile({
     <Link
       href="/projects/new"
       className={cn(
-        "group border border-dashed border-border-strong bg-panel/40 text-muted transition hover:border-nav hover:bg-nav-muted/40 hover:text-foreground",
+        "group box-border w-full border border-dashed border-border-strong bg-panel/40 text-muted transition hover:border-nav hover:bg-nav-muted/40 hover:text-foreground",
         listLike
           ? LIST_ROW
           : rowLike
-            ? "flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-left"
-            : "flex flex-col items-center justify-center rounded-[var(--radius)] text-center",
+            ? "flex h-full items-center gap-3 rounded-[var(--radius)] px-3 py-3 text-left"
+            : "flex h-full flex-col items-center justify-center rounded-[var(--radius)] text-center",
         className,
       )}
     >
@@ -110,18 +124,19 @@ function CreateTile({
           listLike ? "font-medium" : null,
         )}
       >
-        Create new project
+        {t("landing.createProject")}
       </span>
     </Link>
   );
 }
 
 function MetaLine({ project }: { project: HomeProjectItem }) {
+  const t = useT();
   return (
     <span className="text-muted">
       {project.type}
       {project.primaryGenre ? ` · ${project.primaryGenre}` : ""}
-      {!project.setupCompleted ? " · setup incomplete" : ""}
+      {!project.setupCompleted ? ` · ${t("landing.setupIncomplete")}` : ""}
     </span>
   );
 }
@@ -147,6 +162,7 @@ export function ProjectsBrowser({
   onFavoriteChange?: (projectId: string, next: boolean) => void;
   emptyFilterMessage?: string | null;
 }) {
+  const t = useT();
   const showPreview = viewShowsStructurePreview(mode);
   const blobLimit = previewBlobLimit(mode);
 
@@ -156,13 +172,16 @@ export function ProjectsBrowser({
         <table className="w-full min-w-[40rem] text-left text-sm">
           <thead className="border-b border-border text-xs uppercase tracking-wide text-muted">
             <tr>
-              <th className="w-10 px-2 py-2.5 font-medium" aria-label="Favorite" />
-              <th className="px-3 py-2.5 font-medium">Name</th>
-              <th className="px-3 py-2.5 font-medium">Type</th>
-              <th className="px-3 py-2.5 font-medium">Genre</th>
-              <th className="px-3 py-2.5 font-medium">Nodes</th>
-              <th className="px-3 py-2.5 font-medium">Focuses</th>
-              <th className="px-3 py-2.5 font-medium">Updated</th>
+              <th
+                className="w-10 px-2 py-2.5 font-medium"
+                aria-label={t("landing.favorite")}
+              />
+              <th className="px-3 py-2.5 font-medium">{t("common.name")}</th>
+              <th className="px-3 py-2.5 font-medium">{t("common.type")}</th>
+              <th className="px-3 py-2.5 font-medium">{t("landing.genre")}</th>
+              <th className="px-3 py-2.5 font-medium">{t("landing.nodes")}</th>
+              <th className="px-3 py-2.5 font-medium">{t("landing.focuses")}</th>
+              <th className="px-3 py-2.5 font-medium">{t("common.updated")}</th>
             </tr>
           </thead>
           <tbody>
@@ -221,18 +240,18 @@ export function ProjectsBrowser({
   if (mode === "list") {
     return (
       <ul className="grid gap-1 sm:grid-cols-2 xl:grid-cols-3">
-        <li className="min-w-0">
-          <CreateTile mode={mode} />
-        </li>
+        <BrowserCell>
+          <CreateTile mode={mode} className="flex-1" />
+        </BrowserCell>
         {emptyFilterMessage ? (
           <EmptyFilterNotice message={emptyFilterMessage} />
         ) : null}
         {projects.map((project) => (
-          <li key={project.id} className="min-w-0">
+          <BrowserCell key={project.id}>
             <div
               className={cn(
                 LIST_ROW,
-                "border border-transparent bg-panel/40 transition hover:border-border hover:bg-panel",
+                "flex-1 border border-transparent bg-panel/40 transition hover:border-border hover:bg-panel",
               )}
             >
               <FavoriteToggle
@@ -251,7 +270,7 @@ export function ProjectsBrowser({
                 <span className="min-w-0 truncate font-medium">{project.name}</span>
               </Link>
             </div>
-          </li>
+          </BrowserCell>
         ))}
       </ul>
     );
@@ -260,18 +279,18 @@ export function ProjectsBrowser({
   if (mode === "content") {
     return (
       <ul className="grid gap-2 lg:grid-cols-2">
-        <li>
+        <BrowserCell>
           <CreateTile
             mode={mode}
-            className="min-h-[4.5rem] items-center gap-4 px-4 py-3"
+            className="min-h-[4.5rem] flex-1 items-center gap-4 px-4 py-3"
           />
-        </li>
+        </BrowserCell>
         {emptyFilterMessage ? (
           <EmptyFilterNotice message={emptyFilterMessage} />
         ) : null}
         {projects.map((project) => (
-          <li key={project.id}>
-            <div className="surface-card flex min-h-[4.5rem] items-start gap-3 px-4 py-3 transition hover:border-border-strong hover:bg-panel-elevated">
+          <BrowserCell key={project.id}>
+            <div className="surface-card flex min-h-[4.5rem] flex-1 items-start gap-3 px-4 py-3 transition hover:border-border-strong hover:bg-panel-elevated">
               <FavoriteToggle
                 projectId={project.id}
                 isFavorite={project.isFavorite}
@@ -310,7 +329,7 @@ export function ProjectsBrowser({
                 </div>
               </Link>
             </div>
-          </li>
+          </BrowserCell>
         ))}
       </ul>
     );
@@ -319,15 +338,15 @@ export function ProjectsBrowser({
   if (mode === "tiles") {
     return (
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <li>
-          <CreateTile mode={mode} className="h-full min-h-[5.5rem]" />
-        </li>
+        <BrowserCell>
+          <CreateTile mode={mode} className="min-h-[5.5rem] flex-1" />
+        </BrowserCell>
         {emptyFilterMessage ? (
           <EmptyFilterNotice message={emptyFilterMessage} />
         ) : null}
         {projects.map((project) => (
-          <li key={project.id}>
-            <div className="surface-card relative flex h-full items-start gap-3 px-3 py-3 transition hover:border-border-strong hover:bg-panel-elevated">
+          <BrowserCell key={project.id}>
+            <div className="surface-card relative flex min-h-[5.5rem] flex-1 items-start gap-3 px-3 py-3 transition hover:border-border-strong hover:bg-panel-elevated">
               <FavoriteToggle
                 projectId={project.id}
                 isFavorite={project.isFavorite}
@@ -364,7 +383,7 @@ export function ProjectsBrowser({
                 </div>
               </Link>
             </div>
-          </li>
+          </BrowserCell>
         ))}
       </ul>
     );
@@ -374,10 +393,10 @@ export function ProjectsBrowser({
     mode === "extra-large"
       ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       : mode === "large"
-        ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+        ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
         : mode === "small"
-          ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10"
-          : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
+          ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10"
+          : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
 
   const cardPad =
     mode === "extra-large"
@@ -398,21 +417,25 @@ export function ProjectsBrowser({
           : "h-10 w-10 text-sm";
 
   return (
-    <ul className={cn("grid gap-3", gridClass)}>
-      <li>
+    <ul className={cn("grid gap-4 sm:gap-3", gridClass)}>
+      <BrowserCell>
         <CreateTile
           mode={mode}
-          className={cn("h-full", cardPad, mode === "small" ? "min-h-[5.5rem]" : null)}
+          className={cn(
+            "flex-1",
+            cardPad,
+            mode === "small" ? "min-h-[5.5rem]" : null,
+          )}
         />
-      </li>
+      </BrowserCell>
       {emptyFilterMessage ? (
         <EmptyFilterNotice message={emptyFilterMessage} />
       ) : null}
       {projects.map((project) => (
-        <li key={project.id}>
+        <BrowserCell key={project.id}>
           <div
             className={cn(
-              "surface-card group relative flex h-full flex-col transition hover:border-border-strong hover:bg-panel-elevated",
+              "surface-card group relative flex flex-1 flex-col transition hover:border-border-strong hover:bg-panel-elevated",
               cardPad,
               mode === "small" ? "items-center text-center" : "items-stretch",
             )}
@@ -486,7 +509,7 @@ export function ProjectsBrowser({
               ) : null}
             </Link>
           </div>
-        </li>
+        </BrowserCell>
       ))}
     </ul>
   );

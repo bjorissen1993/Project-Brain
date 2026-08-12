@@ -3,6 +3,7 @@ export {
   getNode,
   createNodeAction,
   updateNodeAction,
+  moveNodeInTreeAction,
   deleteNodeAction,
   setNodeStatusAction,
 } from "./actions";

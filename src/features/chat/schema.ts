@@ -70,6 +70,79 @@ export const chatProposalSchema = z.discriminatedUnion("kind", [
   chatProposalCreateFocusSchema,
 ]);
 
+/** Stable key for deduping applied / dismissed proposals across turns. */
+export function chatProposalFingerprint(
+  proposal: z.infer<typeof chatProposalSchema>,
+): string {
+  if (proposal.kind === "create_node") {
+    const parent =
+      proposal.parentClientKey
+        ? `client:${proposal.parentClientKey}`
+        : proposal.parentNodeId
+          ? `id:${proposal.parentNodeId}`
+          : proposal.parentPathIds?.length
+            ? `id:${proposal.parentPathIds[proposal.parentPathIds.length - 1]}`
+            : proposal.parentPath?.length
+              ? `path:${proposal.parentPath.map((n) => n.toLowerCase()).join("/")}`
+              : "root";
+    return `create:${parent}:${proposal.name.trim().toLowerCase()}`;
+  }
+  if (proposal.kind === "update_node") {
+    const name = proposal.name?.trim().toLowerCase() ?? "";
+    return `update:${proposal.nodeId}:${name}`;
+  }
+  return `focus:${proposal.name.trim().toLowerCase()}`;
+}
+
+/**
+ * Drop proposals that match fingerprints from earlier Accept / Dismiss actions.
+ */
+export function filterAlreadyHandledProposals(
+  proposals: z.infer<typeof chatProposalSchema>[],
+  handledFingerprints: Iterable<string>,
+): {
+  proposals: z.infer<typeof chatProposalSchema>[];
+  removedCount: number;
+} {
+  const blocked = new Set(
+    [...handledFingerprints].map((f) => f.trim().toLowerCase()).filter(Boolean),
+  );
+  if (!blocked.size) return { proposals, removedCount: 0 };
+  const kept: z.infer<typeof chatProposalSchema>[] = [];
+  let removedCount = 0;
+  for (const p of proposals) {
+    const fp = chatProposalFingerprint(p).toLowerCase();
+    if (blocked.has(fp)) {
+      removedCount += 1;
+      continue;
+    }
+    // Also block create_node by bare name if any applied create used that name
+    // under any parent (covers parent-key mismatch across turns).
+    if (p.kind === "create_node") {
+      const bare = `create-name:${p.name.trim().toLowerCase()}`;
+      if (blocked.has(bare)) {
+        removedCount += 1;
+        continue;
+      }
+    }
+    kept.push(p);
+  }
+  return { proposals: kept, removedCount };
+}
+
+/** Fingerprints + bare create names to persist after Accept. */
+export function fingerprintsForAppliedProposals(
+  proposals: z.infer<typeof chatProposalSchema>[],
+): string[] {
+  const out = new Set<string>();
+  for (const p of proposals) {
+    out.add(chatProposalFingerprint(p));
+    if (p.kind === "create_node") {
+      out.add(`create-name:${p.name.trim().toLowerCase()}`);
+    }
+  }
+  return [...out];
+}
 export const chatAiResponseSchema = z.object({
   reply: z.string().trim().min(1).max(12000),
   proposals: z.array(chatProposalSchema).max(CHAT_PROPOSAL_MAX).default([]),
@@ -83,6 +156,8 @@ export const sendChatMessageSchema = z.object({
   contextNodeId: z.string().min(1).optional().nullable(),
   /** Optional Structure focus summary from the client (selective). */
   focusSummary: z.string().trim().max(2000).optional().nullable(),
+  /** UI locale so new AI replies match the interface language. */
+  locale: z.enum(["en", "nl"]).optional(),
 });
 
 export const attachGptConversationSchema = z.object({
@@ -98,6 +173,11 @@ export const applyChatProposalsSchema = z.object({
   projectId: z.string().min(1),
   messageId: z.string().min(1),
   proposals: z.array(chatProposalSchema).min(1).max(CHAT_PROPOSAL_MAX),
+});
+
+export const dismissChatProposalsSchema = z.object({
+  projectId: z.string().min(1),
+  messageId: z.string().min(1),
 });
 
 export const getOrCreateChatThreadSchema = z.object({

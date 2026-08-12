@@ -67,6 +67,7 @@ export const genericSetupSuggestionSchema = z.object({
 export const suggestSetupFromIntentInputSchema = z.object({
   projectId: z.string().min(1),
   intentText: z.string().trim().min(1, "Describe the experience first").max(10000),
+  locale: z.enum(["en", "nl"]).optional(),
 });
 
 export type SetupSuggestionParsed = z.infer<typeof setupSuggestionSchema>;

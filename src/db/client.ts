@@ -22,7 +22,9 @@ function isStalePrismaClient(client: PrismaClient): boolean {
   const delegates = client as {
     chatThread?: unknown;
     nodeImage?: unknown;
-    project?: { fields?: { isFavorite?: unknown } };
+    user?: unknown;
+    account?: unknown;
+    project?: { fields?: { isFavorite?: unknown; githubRepo?: unknown } };
   };
   if (typeof delegates.chatThread === "undefined") {
     return true;
@@ -30,8 +32,14 @@ function isStalePrismaClient(client: PrismaClient): boolean {
   if (typeof delegates.nodeImage === "undefined") {
     return true;
   }
+  if (typeof delegates.user === "undefined" || typeof delegates.account === "undefined") {
+    return true;
+  }
   // New scalar fields do not appear as top-level delegates — check Project.fields.
-  return typeof delegates.project?.fields?.isFavorite === "undefined";
+  if (typeof delegates.project?.fields?.isFavorite === "undefined") {
+    return true;
+  }
+  return typeof delegates.project?.fields?.githubRepo === "undefined";
 }
 
 function getPrismaClient(): PrismaClient {

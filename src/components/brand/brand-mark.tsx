@@ -58,7 +58,7 @@ export function BrandMark({
           alt="Project Brain"
           priority={priority}
           unoptimized
-          className={cn("h-7 w-auto sm:h-8", BLEND)}
+          className={cn("h-7 w-auto max-w-[7.5rem] sm:h-8 sm:max-w-none", BLEND)}
         />
       </span>
     ) : (

@@ -179,6 +179,8 @@ export type ReadyNodeAnalysisData = NodeAIAnalysis & {
 
 export type AIServiceOptions = {
   modelTier?: AIModelTier;
+  /** UI locale (`pb:locale`) — new AI text should match when set. */
+  locale?: "en" | "nl";
 };
 
 export type {

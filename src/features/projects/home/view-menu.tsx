@@ -2,12 +2,23 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, LayoutGrid } from "lucide-react";
+import { useT, type MessageKey } from "@/features/i18n";
 import { cn } from "@/lib/utils";
 import {
-  PROJECT_VIEW_LABELS,
   PROJECT_VIEW_MODES,
   type ProjectViewMode,
 } from "./view-mode";
+
+const VIEW_LABEL_KEYS: Record<ProjectViewMode, MessageKey> = {
+  "extra-large": "landing.viewExtraLarge",
+  large: "landing.viewLarge",
+  medium: "landing.viewMedium",
+  small: "landing.viewSmall",
+  list: "landing.viewList",
+  details: "landing.viewDetails",
+  tiles: "landing.viewTiles",
+  content: "landing.viewContent",
+};
 
 function ViewGlyph({ mode, className }: { mode: ProjectViewMode; className?: string }) {
   const common = cn("text-foreground", className);
@@ -81,9 +92,11 @@ export function ProjectViewMenu({
   value: ProjectViewMode;
   onChange: (mode: ProjectViewMode) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  const currentLabel = t(VIEW_LABEL_KEYS[value]);
 
   useEffect(() => {
     if (!open) return;
@@ -112,15 +125,15 @@ export function ProjectViewMenu({
         className="inline-flex items-center gap-2 rounded-[var(--radius)] border border-border bg-panel px-3 py-1.5 text-sm text-foreground transition hover:border-border-strong hover:bg-panel-elevated"
       >
         <LayoutGrid className="h-4 w-4 text-muted" aria-hidden />
-        <span>View</span>
-        <span className="hidden text-muted sm:inline">· {PROJECT_VIEW_LABELS[value]}</span>
+        <span>{t("landing.viewMenu")}</span>
+        <span className="hidden text-muted sm:inline">· {currentLabel}</span>
       </button>
 
       {open ? (
         <div
           id={menuId}
           role="menu"
-          aria-label="View"
+          aria-label={t("landing.viewMenu")}
           className="absolute right-0 z-30 mt-1.5 min-w-[13.5rem] overflow-hidden rounded-[var(--radius)] border border-border-strong bg-[#202020] py-1 shadow-lg"
         >
           {PROJECT_VIEW_MODES.map((mode) => {
@@ -144,7 +157,7 @@ export function ProjectViewMenu({
                   {selected ? <Check className="h-3 w-3" strokeWidth={2.5} /> : null}
                 </span>
                 <ViewGlyph mode={mode} />
-                <span>{PROJECT_VIEW_LABELS[mode]}</span>
+                <span>{t(VIEW_LABEL_KEYS[mode])}</span>
               </button>
             );
           })}

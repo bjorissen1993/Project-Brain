@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import {
   runImbalanceAnalysisAction,
   runImprovementSuggestionsAction,
 } from "@/features/analysis/project-analysis-actions";
+import { useLocale, useT } from "@/features/i18n";
 
 type ImbalanceView = {
   id: string;
@@ -32,6 +34,8 @@ export function BalanceAIPanel({
   imbalance: ImbalanceView;
   improvements: ImprovementRow[];
 }) {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -59,10 +63,8 @@ export function BalanceAIPanel({
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="font-display text-xl">AI design analysis</h2>
-          <p className="text-xs text-muted">
-            Narrates code-computed balance. Suggestions never auto-apply.
-          </p>
+          <h2 className="font-display text-xl">{t("balance.aiTitle")}</h2>
+          <p className="text-xs text-muted">{t("balance.aiIntro")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -72,7 +74,9 @@ export function BalanceAIPanel({
               setError(null);
               setMessage(null);
               startTransition(async () => {
-                const r = await runImbalanceAnalysisAction(projectId);
+                const r = await runImbalanceAnalysisAction(projectId, {
+                  locale,
+                });
                 if (!r.ok) {
                   setError(r.error);
                   return;
@@ -82,7 +86,7 @@ export function BalanceAIPanel({
               });
             }}
           >
-            Analyze imbalance
+            {t("balance.analyzeImbalance")}
           </Button>
           <Button
             disabled={pending}
@@ -90,7 +94,9 @@ export function BalanceAIPanel({
               setError(null);
               setMessage(null);
               startTransition(async () => {
-                const r = await runImprovementSuggestionsAction(projectId);
+                const r = await runImprovementSuggestionsAction(projectId, {
+                  locale,
+                });
                 if (!r.ok) {
                   setError(r.error);
                   return;
@@ -100,7 +106,7 @@ export function BalanceAIPanel({
               });
             }}
           >
-            Suggest improvements
+            {t("balance.suggestImprovements")}
           </Button>
         </div>
       </div>
@@ -110,7 +116,7 @@ export function BalanceAIPanel({
 
       {imbalance?.status === "deferred" ? (
         <div className="rounded-[var(--radius)] border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
-          Analysis pending — configure OPENAI_API_KEY
+          {t("balance.pendingKey")}
         </div>
       ) : null}
 
@@ -124,7 +130,7 @@ export function BalanceAIPanel({
               <li key={i} className="border-t border-border pt-2 text-sm">
                 <p className="font-semibold">
                   <span className="mr-2 text-xs uppercase text-muted">
-                    {f.severity}
+                    {f.severity === "info" ? t("balance.info") : f.severity}
                   </span>
                   {f.title}
                 </p>
@@ -136,7 +142,8 @@ export function BalanceAIPanel({
             ))}
           </ul>
           <p className="text-[10px] text-muted">
-            {imbalance?.model} · {imbalance?.createdAt
+            {imbalance?.model} ·{" "}
+            {imbalance?.createdAt
               ? new Date(imbalance.createdAt).toLocaleString()
               : ""}
           </p>
@@ -145,7 +152,9 @@ export function BalanceAIPanel({
 
       {improvements.length ? (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">Improvement suggestions</h3>
+          <h3 className="text-sm font-semibold">
+            {t("balance.improvementSuggestions")}
+          </h3>
           {improvements.map((s) => (
             <div key={s.id} className="surface-card px-3 py-3 text-sm">
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -172,7 +181,7 @@ export function BalanceAIPanel({
                         });
                       }}
                     >
-                      Accept
+                      {t("balance.accept")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -187,7 +196,7 @@ export function BalanceAIPanel({
                         });
                       }}
                     >
-                      Reject
+                      {t("balance.reject")}
                     </Button>
                   </div>
                 ) : null}
@@ -196,6 +205,16 @@ export function BalanceAIPanel({
           ))}
         </div>
       ) : null}
+
+      <p className="text-xs text-muted">
+        <Link
+          href={`/projects/${projectId}/intelligence`}
+          className="text-accent underline"
+        >
+          {t("balance.openIntelligence")}
+        </Link>{" "}
+        {t("balance.openIntelligenceSuffix")}
+      </p>
     </section>
   );
 }

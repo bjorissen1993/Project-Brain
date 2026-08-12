@@ -1,28 +1,32 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useT, type MessageKey } from "@/features/i18n";
 import type { RelationMode } from "./relation-strength";
 
-const MODES: { id: RelationMode; label: string; title: string }[] = [
-  { id: "off", label: "Off", title: "Hide relation curves" },
+const MODE_KEYS: {
+  id: RelationMode;
+  label: MessageKey;
+  title: MessageKey;
+}[] = [
+  {
+    id: "off",
+    label: "structure.relOff",
+    title: "structure.relOffTitle",
+  },
   {
     id: "focused",
-    label: "Focused",
-    title: "Show connections for the hovered blob",
+    label: "structure.relFocused",
+    title: "structure.relFocusedTitle",
   },
   {
     id: "strong",
-    label: "Strong",
-    title: "Show only stronger relations",
-  },
-  {
-    id: "all",
-    label: "All",
-    title: "Show all relations above the visibility threshold",
+    label: "structure.relStrong",
+    title: "structure.relStrongTitle",
   },
 ];
 
-/** Compact Off | Focused | Strong | All control — Structure sidebar under View. */
+/** Compact Off | Focused | Strong control — Structure sidebar under View. */
 export function FocusRelationsControl({
   mode,
   onChange,
@@ -32,6 +36,7 @@ export function FocusRelationsControl({
   onChange: (mode: RelationMode) => void;
   className?: string;
 }) {
+  const t = useT();
   return (
     <div
       className={cn(
@@ -39,16 +44,16 @@ export function FocusRelationsControl({
         className,
       )}
       role="group"
-      aria-label="Relation visibility"
+      aria-label={t("structure.relationsAria")}
     >
       <span className="px-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
-        Relations
+        {t("structure.relations")}
       </span>
-      {MODES.map((m) => (
+      {MODE_KEYS.map((m) => (
         <button
           key={m.id}
           type="button"
-          title={m.title}
+          title={t(m.title)}
           aria-pressed={mode === m.id}
           className={cn(
             "flex-1 rounded-[calc(var(--radius)-2px)] px-1.5 py-1 text-center font-medium transition-colors",
@@ -58,7 +63,7 @@ export function FocusRelationsControl({
           )}
           onClick={() => onChange(m.id)}
         >
-          {m.label}
+          {t(m.label)}
         </button>
       ))}
     </div>

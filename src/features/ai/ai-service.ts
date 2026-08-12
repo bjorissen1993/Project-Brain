@@ -24,6 +24,7 @@ import {
   type NodeAIAnalysis,
 } from "./node-analysis-schema";
 import { hasOpenAIApiKey, openAIChatJson } from "./openai-client";
+import { aiLocaleInstruction } from "./locale-prompt";
 import {
   normalizeChildElementSuggestions,
   normalizeSuggestionName,
@@ -202,7 +203,7 @@ Return a single JSON object matching:
   "suggestedProjectAreas": [{ "name", "templateKey?", "selected", "reasoning?" }],
   "suggestedDesignFocuses": [{ "name", "parentName?", "templateKey?", "selected", "targetImportance", "reasoning?" }],
   "extractedIntentHints": { "primaryExperiences"?: string[], "supportingSystems"?: string[], "minorSystems"?: string[], "thingsToAvoid"?: string[] }
-}`;
+}` + aiLocaleInstruction(options?.locale);
 
   const user = `Genre catalog:\n\n${catalog}\n\n---\nCreator intent (source of truth):\n${intentText}`;
 
@@ -340,7 +341,7 @@ Return a single JSON object matching:
   "suggestedProjectAreas": [{ "name", "templateKey?", "selected", "reasoning?" }],
   "suggestedDesignFocuses": [{ "name", "parentName?", "templateKey?", "selected", "targetImportance", "reasoning?" }],
   "extractedIntentHints": { "primaryExperiences"?: string[], "supportingSystems"?: string[], "minorSystems"?: string[], "thingsToAvoid"?: string[] }
-}`;
+}` + aiLocaleInstruction(options?.locale);
 
   const user = `Type catalog:\n\n${catalog}\n\n---\nCreator intent (source of truth):\n${intentText}`;
 
@@ -467,10 +468,11 @@ async function runReadyOpenAI(
     validNodeIds: Set<string>;
     selfNodeId: string;
     modelTier: "quick" | "standard" | "deep";
+    locale?: "en" | "nl";
   },
 ): Promise<AIServiceResult<NodeAIAnalysis>> {
   const completion = await openAIChatJson({
-    system: READY_ANALYSIS_SYSTEM,
+    system: READY_ANALYSIS_SYSTEM + aiLocaleInstruction(opts.locale),
     user: promptUser,
     modelTier: opts.modelTier,
     temperature: 0.25,
@@ -538,7 +540,7 @@ export class ProjectBrainAIService implements AIService {
   > {
     const full = await this.analyzeReadyNode(
       { projectId: input.projectId, nodeId: input.nodeId },
-      { modelTier: options?.modelTier ?? "quick" },
+      { modelTier: options?.modelTier ?? "quick", locale: options?.locale },
     );
     if (!full.ok || !full.data) {
       return {
@@ -582,7 +584,7 @@ export class ProjectBrainAIService implements AIService {
   ): Promise<AIServiceResult<{ summary: string; projectImpact?: string }>> {
     const full = await this.analyzeReadyNode(
       { projectId: input.projectId, nodeId: input.nodeId },
-      { modelTier: options?.modelTier ?? "quick" },
+      { modelTier: options?.modelTier ?? "quick", locale: options?.locale },
     );
     if (!full.ok || !full.data) {
       return {
@@ -613,7 +615,7 @@ export class ProjectBrainAIService implements AIService {
     // Prefer the Ready pipeline (context builder already prefers child summaries).
     const full = await this.analyzeReadyNode(
       { projectId: input.projectId, nodeId: input.parentNodeId },
-      { modelTier: options?.modelTier ?? "quick" },
+      { modelTier: options?.modelTier ?? "quick", locale: options?.locale },
     );
     if (full.ok && full.data) {
       return {
@@ -738,6 +740,7 @@ export class ProjectBrainAIService implements AIService {
       validNodeIds: ctx.validNodeIds,
       selfNodeId: ctx.nodeId,
       modelTier: tier,
+      locale: options?.locale,
     });
 
     if (!result.ok || !result.data) {
@@ -806,7 +809,7 @@ Return JSON:
   "summary": string,
   "respectsIntent": boolean,
   "findings": [{ "designFocusId"?: string, "severity": "info"|"warning"|"critical", "title": string, "description": string, "suggestedAction"?: string }]
-}`,
+}` + aiLocaleInstruction(options?.locale),
       user: ctx.promptUser,
       modelTier: tier,
       temperature: 0.3,
@@ -907,7 +910,7 @@ Return JSON:
     "relatedFocusIds": string[],
     "priority": "low"|"medium"|"high"
   }]
-}`,
+}` + aiLocaleInstruction(options?.locale),
       user: ctx.promptUser,
       modelTier: tier,
       temperature: 0.4,
@@ -1387,7 +1390,7 @@ Suggest ${atRoot ? "top-level" : "child"} structure sections that would help dev
     if (input.scope === "node" && input.targetId) {
       const result = await this.analyzeReadyNode(
         { projectId: input.projectId, nodeId: input.targetId },
-        { modelTier: tier },
+        { modelTier: tier, locale: options?.locale },
       );
       return {
         ok: result.ok,

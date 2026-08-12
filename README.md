@@ -55,6 +55,13 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Auth (optional locally)
+
+Copy the Auth.js / allowlist keys from `.env.example` when you want Google + GitHub login.  
+With `AUTH_SECRET` and at least one provider set, the app requires sign-in and enforces `ALLOWED_EMAILS` / `ALLOWED_GITHUB_USERS`.
+
+Production checklist (DNS, OAuth apps, Coolify/Vercel, migrate): see [`docs/DEPLOY-brain.freakydev.com.md`](docs/DEPLOY-brain.freakydev.com.md).
+
 ## Phase status
 
 | Phase | Status |

@@ -25,7 +25,10 @@ function revalidateAnalysisPaths(projectId: string, nodeId: string) {
   revalidatePath(`/projects/${projectId}/balance`);
 }
 
-export async function reanalyzeNodeAction(nodeId: string) {
+export async function reanalyzeNodeAction(
+  nodeId: string,
+  opts?: { locale?: "en" | "nl" },
+) {
   const node = await prisma.node.findUnique({
     where: { id: nodeId },
     select: { id: true, projectId: true, status: true },
@@ -38,7 +41,10 @@ export async function reanalyzeNodeAction(nodeId: string) {
     };
   }
 
-  const result = await runReadyAnalysis(node.id, { force: true });
+  const result = await runReadyAnalysis(node.id, {
+    force: true,
+    locale: opts?.locale,
+  });
   revalidateAnalysisPaths(node.projectId, node.id);
 
   if (!result.ok) {

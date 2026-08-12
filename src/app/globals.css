@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 /* Project Brain — dark professional dashboard (CORONA-inspired) */
-:root {
+:root,
+html[data-theme="dark"] {
   --background: #0f1015;
   --foreground: #ffffff;
   --muted: #6c7293;
@@ -28,6 +29,141 @@
   --context-width: 20rem;
   --radius: 0.5rem;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --font-scale: 1;
+}
+
+html[data-theme="light"] {
+  --background: #eef1f6;
+  --foreground: #1a1d24;
+  --muted: #5c6378;
+  --muted-bg: #e2e6ef;
+  --panel: #ffffff;
+  --panel-elevated: #f5f7fb;
+  --border: #d5dae5;
+  --border-strong: #b4bbcc;
+  --accent: #00a848;
+  --accent-hover: #009640;
+  --accent-muted: rgba(0, 168, 72, 0.12);
+  --nav: #0078c8;
+  --nav-hover: #0066ad;
+  --nav-muted: rgba(0, 120, 200, 0.12);
+  --danger: #e0353c;
+  --warning: #d99200;
+  --purple: #7a4fd4;
+  --ready: #00a848;
+  --review: #7a4fd4;
+  --in-progress: #0078c8;
+  --draft: #5c6378;
+  --idea: #d99200;
+  --shadow: 0 1px 2px rgba(26, 29, 36, 0.06);
+}
+
+/* High-contrast mono — stark focus, minimal chroma */
+html[data-theme="mono"] {
+  --background: #050505;
+  --foreground: #f5f5f5;
+  --muted: #8a8a8a;
+  --muted-bg: #1a1a1a;
+  --panel: #0e0e0e;
+  --panel-elevated: #161616;
+  --border: #2a2a2a;
+  --border-strong: #4a4a4a;
+  --accent: #f0f0f0;
+  --accent-hover: #ffffff;
+  --accent-muted: rgba(240, 240, 240, 0.12);
+  --nav: #c8c8c8;
+  --nav-hover: #ffffff;
+  --nav-muted: rgba(200, 200, 200, 0.14);
+  --danger: #ff4d4d;
+  --warning: #e6e6e6;
+  --purple: #b0b0b0;
+  --ready: #f0f0f0;
+  --review: #b0b0b0;
+  --in-progress: #c8c8c8;
+  --draft: #8a8a8a;
+  --idea: #e6e6e6;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* Cool slate — steel blues */
+html[data-theme="slate"] {
+  --background: #0c1218;
+  --foreground: #e8eef4;
+  --muted: #7a8fa3;
+  --muted-bg: #1a2430;
+  --panel: #121a22;
+  --panel-elevated: #18232e;
+  --border: #243140;
+  --border-strong: #354858;
+  --accent: #3dd6c6;
+  --accent-hover: #54e0d2;
+  --accent-muted: rgba(61, 214, 198, 0.14);
+  --nav: #5b9fd4;
+  --nav-hover: #74b0de;
+  --nav-muted: rgba(91, 159, 212, 0.16);
+  --danger: #f07178;
+  --warning: #e0b35c;
+  --purple: #7f9bb8;
+  --ready: #3dd6c6;
+  --review: #7f9bb8;
+  --in-progress: #5b9fd4;
+  --draft: #7a8fa3;
+  --idea: #e0b35c;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Warm charcoal — ember accents */
+html[data-theme="charcoal"] {
+  --background: #141210;
+  --foreground: #f3ebe3;
+  --muted: #9a8f84;
+  --muted-bg: #2a2521;
+  --panel: #1c1916;
+  --panel-elevated: #24201c;
+  --border: #342e28;
+  --border-strong: #4a4138;
+  --accent: #e08a4a;
+  --accent-hover: #eba05f;
+  --accent-muted: rgba(224, 138, 74, 0.16);
+  --nav: #d4a574;
+  --nav-hover: #e0b68a;
+  --nav-muted: rgba(212, 165, 116, 0.16);
+  --danger: #e05a4e;
+  --warning: #e0b35c;
+  --purple: #c49a78;
+  --ready: #e08a4a;
+  --review: #c49a78;
+  --in-progress: #d4a574;
+  --draft: #9a8f84;
+  --idea: #e0b35c;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Green phosphor — classic CRT terminal glow */
+html[data-theme="phosphor"] {
+  --background: #020805;
+  --foreground: #33ff66;
+  --muted: #2a9a4a;
+  --muted-bg: #0a1a10;
+  --panel: #06120a;
+  --panel-elevated: #0c1e12;
+  --border: #143820;
+  --border-strong: #1e4a2c;
+  --accent: #00ff66;
+  --accent-hover: #33ff77;
+  --accent-muted: rgba(0, 255, 102, 0.12);
+  --nav: #22cc55;
+  --nav-hover: #44ee66;
+  --nav-muted: rgba(34, 204, 85, 0.14);
+  --danger: #ff4455;
+  --warning: #c8e050;
+  --purple: #5ec88a;
+  --ready: #00ff66;
+  --review: #5ec88a;
+  --in-progress: #22cc55;
+  --draft: #2a9a4a;
+  --idea: #c8e050;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
@@ -53,7 +189,8 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+  /* Only when no explicit theme is set yet (boot script always sets one). */
+  html:not([data-theme]) {
     --background: #f0f1f5;
     --foreground: #1a1d24;
     --muted: #6c7293;
@@ -89,11 +226,34 @@ body {
   min-height: 100%;
 }
 
+html {
+  font-size: calc(16px * var(--font-scale, 1));
+  /* Prevent accidental horizontal page scroll on narrow viewports. */
+  overflow-x: clip;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), "Segoe UI", sans-serif;
   font-feature-settings: "ss01" on, "kern" on;
+  overflow-x: clip;
+}
+
+/* Safe-area helpers for notched phones (requires viewport-fit=cover). */
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-px {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.fab-safe {
+  bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.65rem));
+  right: max(1rem, calc(env(safe-area-inset-right, 0px) + 0.65rem));
 }
 
 h1,
@@ -152,6 +312,56 @@ input[type="range"] {
   }
   50% {
     opacity: 0.85;
+  }
+}
+
+/* Graph view — soft hover “oplichten” (glow pulse, not a hard ring) */
+@keyframes graph-node-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.14;
+  }
+  50% {
+    opacity: 0.32;
+  }
+}
+
+@keyframes graph-node-glow-ring {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes graph-node-glow-ring-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.graph-node-glow {
+  animation: graph-node-glow-pulse 1.7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.graph-node-glow-ring {
+  animation:
+    graph-node-glow-ring 0.28s ease-out forwards,
+    graph-node-glow-ring-pulse 1.7s ease-in-out 0.28s infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-node-glow,
+  .graph-node-glow-ring {
+    animation: none;
+    opacity: 0.28;
   }
 }
 
@@ -529,6 +739,18 @@ input[type="range"] {
   background: color-mix(in srgb, var(--nav) 42%, transparent);
   box-shadow: 0 0 5px color-mix(in srgb, var(--nav) 22%, transparent);
   will-change: left, top, opacity;
+}
+
+/* Tree+Details children rows — soft nav glow on hover/active */
+.structure-details-child:hover,
+.structure-details-child:focus-within {
+  z-index: 10;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .structure-details-child {
+    transition: none !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

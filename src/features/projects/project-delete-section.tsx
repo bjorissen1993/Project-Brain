@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label } from "@/components/ui/field";
+import { useT } from "@/features/i18n";
 import { deleteProjectAction } from "@/features/projects/actions";
 
 /** Danger-zone delete for the current project (Profile). Requires typing the name. */
@@ -14,6 +15,7 @@ export function ProjectDeleteSection({
   projectId: string;
   projectName: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const [confirmName, setConfirmName] = useState("");
   const [expanded, setExpanded] = useState(false);
@@ -31,12 +33,11 @@ export function ProjectDeleteSection({
       className="scroll-mt-8 space-y-3 rounded-[var(--radius)] border border-danger/35 bg-danger/5 p-5"
     >
       <div>
-        <h2 className="font-display text-xl text-danger">Delete project</h2>
+        <h2 className="font-display text-xl text-danger">
+          {t("profile.deleteTitle")}
+        </h2>
         <p className="mt-1 text-sm text-muted">
-          Permanently remove{" "}
-          <span className="font-medium text-foreground">{projectName}</span> and
-          all of its structure, design focuses, analyses, and related data. This
-          cannot be undone.
+          {t("profile.deleteDesc", { name: projectName })}
         </p>
       </div>
 
@@ -50,7 +51,7 @@ export function ProjectDeleteSection({
             setConfirmName("");
           }}
         >
-          Delete this project…
+          {t("profile.deleteExpand")}
         </Button>
       ) : (
         <div className="space-y-3">
@@ -59,11 +60,7 @@ export function ProjectDeleteSection({
               htmlFor="delete-project-confirm"
               className="normal-case tracking-normal"
             >
-              Type{" "}
-              <span className="font-semibold text-foreground">
-                &ldquo;{projectName}&rdquo;
-              </span>{" "}
-              to confirm
+              {t("profile.deleteConfirmLabel", { name: projectName })}
             </Label>
             <Input
               id="delete-project-confirm"
@@ -86,7 +83,7 @@ export function ProjectDeleteSection({
                 setError(null);
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
@@ -96,7 +93,7 @@ export function ProjectDeleteSection({
                 if (!nameMatches) return;
                 if (
                   !confirm(
-                    `Delete project “${projectName}” permanently? All related data will be removed.`,
+                    t("profile.deleteConfirmPrompt", { name: projectName }),
                   )
                 ) {
                   return;
@@ -116,7 +113,9 @@ export function ProjectDeleteSection({
                 });
               }}
             >
-              {pending ? "Deleting…" : "Delete permanently"}
+              {pending
+                ? t("profile.deleting")
+                : t("profile.deletePermanently")}
             </Button>
           </div>
         </div>

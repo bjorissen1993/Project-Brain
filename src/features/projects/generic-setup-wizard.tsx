@@ -10,7 +10,7 @@ import {
   completeGenericSetupAction,
 } from "@/features/projects/actions";
 import { suggestSetupFromIntentAction } from "@/features/game-profile/actions";
-import { IMPORTANCE_SLIDER_FALLBACK } from "@/features/game-profile/genre-templates";
+import { useLocale, useT, type MessageKey } from "@/features/i18n";
 import {
   getProjectTypeAreas,
   getProjectTypeFocusTemplates,
@@ -30,6 +30,15 @@ import { iconKeyForName, PbIcon } from "@/lib/icons";
 import { PROJECT_TYPE_OPTIONS, type ProjectType } from "@/types";
 import { cn } from "@/lib/utils";
 
+const TYPE_LABEL_KEY: Partial<Record<ProjectType, MessageKey>> = {
+  GAME: "landing.typeGame",
+  SOFTWARE: "landing.typeSoftware",
+  APP: "landing.typeApp",
+  CREATIVE: "landing.typeCreative",
+  OTHER: "landing.typeOther",
+  CUSTOM: "landing.typeCustom",
+};
+
 type FocusSelection = {
   key: string;
   name: string;
@@ -48,9 +57,6 @@ type AreaSelection = {
   isCustom: boolean;
   reasoning?: string;
 };
-
-const INTENT_PLACEHOLDER = `Example:
-Build a calm personal finance app that helps people feel in control of irregular income — clear cash-flow views, gentle reminders, and no shamey “you overspent” tone. Optimize for trust, clarity, and low cognitive load. Avoid dark patterns, aggressive upsells, and noisy dashboards.`;
 
 function flattenTypeFocuses(projectType: ProjectType): FocusSelection[] {
   return getProjectTypeFocusTemplates(projectType).flatMap((focus) => {
@@ -107,10 +113,14 @@ export function GenericSetupWizard({
   projectName: string;
   projectType: Exclude<ProjectType, "GAME">;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
-  const typeLabel =
-    PROJECT_TYPE_OPTIONS.find((o) => o.value === projectType)?.label ??
-    projectTypeSetupLabel(projectType);
+  const typeKey = TYPE_LABEL_KEY[projectType];
+  const typeLabel = typeKey
+    ? t(typeKey)
+    : (PROJECT_TYPE_OPTIONS.find((o) => o.value === projectType)?.label ??
+      projectTypeSetupLabel(projectType));
 
   const [step, setStep] = useState(0);
   const [intent, setIntent] = useState("");
@@ -165,7 +175,12 @@ export function GenericSetupWizard({
     [templateAreas, customAreas],
   );
 
-  const steps = ["Intent", "Project Areas", "Design Focus", "Review"];
+  const steps = [
+    t("wizard.stepIntent"),
+    t("wizard.stepAreas"),
+    t("wizard.stepFocus"),
+    t("wizard.stepReview"),
+  ];
 
   function hasProgressBeyondStart() {
     return (
@@ -299,7 +314,7 @@ export function GenericSetupWizard({
   function generateAndContinue() {
     setError(null);
     if (!intent.trim()) {
-      setError("Describe what this project should become first.");
+      setError(t("wizard.needIntentProject"));
       return;
     }
 
@@ -307,6 +322,7 @@ export function GenericSetupWizard({
       const result = await suggestSetupFromIntentAction({
         projectId,
         intentText: intent,
+        locale,
       });
       if (!result.ok) {
         setError(result.error);
@@ -382,13 +398,15 @@ export function GenericSetupWizard({
   }
 
   const suggestionLabel =
-    suggestionMeta?.source === "ai" ? "AI suggestions" : "Heuristic suggestions";
+    suggestionMeta?.source === "ai"
+      ? t("wizard.aiSuggestions")
+      : t("wizard.heuristicSuggestions");
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
-          {projectName} · {typeLabel} configuration
+          {t("wizard.configEyebrow", { name: projectName, type: typeLabel })}
         </p>
         <Button
           type="button"
@@ -397,14 +415,12 @@ export function GenericSetupWizard({
           onClick={() => setLeaveOpen(true)}
           className="text-xs"
         >
-          {cancelling ? "Discarding…" : "Cancel · Back to home"}
+          {cancelling ? t("wizard.discarding") : t("wizard.cancelHome")}
         </Button>
       </div>
-      <h1 className="mt-3 font-display text-3xl">Configure your project</h1>
+      <h1 className="mt-3 font-display text-3xl">{t("wizard.configureProject")}</h1>
       <p className="mt-2 max-w-prose text-sm text-muted">
-        Intent first, then Project Areas and Design Focus. Suggestions are
-        advisory — accept, edit, or reject before anything is saved. Genre
-        templates stay on Game projects.
+        {t("wizard.introProject")}
       </p>
 
       <ol className="mt-8 flex flex-wrap gap-2">
@@ -434,30 +450,30 @@ export function GenericSetupWizard({
               </p>
               <p className="mt-1 text-muted">{suggestionMeta.message}</p>
               <p className="mt-1 text-xs text-muted">
-                Pre-filled below for edit — nothing is committed until Finish setup.
+                {t("wizard.prefilled")}
               </p>
             </div>
             <Button type="button" variant="ghost" onClick={clearSuggestionState}>
-              Reject suggestions
+              {t("wizard.rejectSuggestions")}
             </Button>
           </div>
           {suggestionMeta.hints ? (
             <div className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2">
               {suggestionMeta.hints.primaryExperiences?.length ? (
                 <p>
-                  <span className="text-foreground">Experiences: </span>
+                  <span className="text-foreground">{t("wizard.experiences")} </span>
                   {suggestionMeta.hints.primaryExperiences.join(" · ")}
                 </p>
               ) : null}
               {suggestionMeta.hints.supportingSystems?.length ? (
                 <p>
-                  <span className="text-foreground">Systems: </span>
+                  <span className="text-foreground">{t("wizard.systems")} </span>
                   {suggestionMeta.hints.supportingSystems.join(" · ")}
                 </p>
               ) : null}
               {suggestionMeta.hints.thingsToAvoid?.length ? (
                 <p className="sm:col-span-2">
-                  <span className="text-foreground">Avoid: </span>
+                  <span className="text-foreground">{t("wizard.avoid")} </span>
                   {suggestionMeta.hints.thingsToAvoid.join(" · ")}
                 </p>
               ) : null}
@@ -469,18 +485,16 @@ export function GenericSetupWizard({
       <div className="mt-8 space-y-6">
         {step === 0 ? (
           <div className="max-w-3xl">
-            <Label htmlFor="intent">Project intent</Label>
+            <Label htmlFor="intent">{t("wizard.projectIntent")}</Label>
             <p className="mb-2 max-w-prose text-sm text-muted">
-              Tell the story of what this project should become — the foundation.
-              Your wording is the source of truth. We&apos;ll suggest Project Areas
-              and Design Focus sliders from it; you decide what to keep.
+              {t("wizard.intentHelpProject")}
             </p>
             <Textarea
               id="intent"
               rows={12}
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              placeholder={INTENT_PLACEHOLDER}
+              placeholder={t("wizard.intentPlaceholderProject")}
               className="min-h-[280px] leading-relaxed"
             />
           </div>
@@ -489,10 +503,7 @@ export function GenericSetupWizard({
         {step === 1 ? (
           <>
             <p className="max-w-prose text-sm text-muted">
-              What sections do you want to organize this project around? These
-              become top-level folders in Project Structure (Focus Space). No
-              importance sliders — areas are where ideas live, not what the
-              project emphasizes.
+              {t("wizard.areasHelp")}
             </p>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {allAreas.map((area) => {
@@ -524,7 +535,7 @@ export function GenericSetupWizard({
                         <span className="font-medium">{area.name}</span>
                         {area.isCustom ? (
                           <span className="text-[10px] uppercase text-muted">
-                            Custom
+                            {t("wizard.custom")}
                           </span>
                         ) : null}
                       </div>
@@ -541,7 +552,7 @@ export function GenericSetupWizard({
               <Input
                 value={customAreaName}
                 onChange={(e) => setCustomAreaName(e.target.value)}
-                placeholder="Add custom project area"
+                placeholder={t("wizard.addCustomArea")}
               />
               <Button
                 type="button"
@@ -560,7 +571,7 @@ export function GenericSetupWizard({
                   setCustomAreaName("");
                 }}
               >
-                Add
+                {t("common.add")}
               </Button>
             </div>
           </>
@@ -569,9 +580,7 @@ export function GenericSetupWizard({
         {step === 2 ? (
           <>
             <p className="max-w-prose text-sm text-muted">
-              What should this project emphasize? Design Focuses are analysis
-              criteria with target importance — not Project Structure folders.
-              Adjust freely; values are independent and need not sum to 100.
+              {t("wizard.focusHelp")}
             </p>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {allFocuses.map((focus) => {
@@ -607,7 +616,7 @@ export function GenericSetupWizard({
                           </span>
                           {focus.isCustom ? (
                             <span className="text-[10px] uppercase text-muted">
-                              Custom
+                              {t("wizard.custom")}
                             </span>
                           ) : null}
                         </div>
@@ -622,7 +631,7 @@ export function GenericSetupWizard({
                         {checked ? (
                           <div className="mt-3">
                             <div className="mb-1 flex justify-between text-xs text-muted">
-                              <span>Target importance</span>
+                              <span>{t("wizard.targetImportance")}</span>
                               <span>
                                 {importance[focus.key] ?? focus.targetImportance}
                               </span>
@@ -643,7 +652,7 @@ export function GenericSetupWizard({
                               className="w-full accent-[var(--accent)]"
                             />
                             <p className="mt-1 text-[11px] leading-snug text-muted">
-                              {IMPORTANCE_SLIDER_FALLBACK}
+                              {t("wizard.importanceHint")}
                             </p>
                           </div>
                         ) : null}
@@ -658,7 +667,7 @@ export function GenericSetupWizard({
               <Input
                 value={customFocusName}
                 onChange={(e) => setCustomFocusName(e.target.value)}
-                placeholder="Add custom design focus"
+                placeholder={t("wizard.addCustomFocus")}
               />
               <Button
                 type="button"
@@ -679,7 +688,7 @@ export function GenericSetupWizard({
                   setCustomFocusName("");
                 }}
               >
-                Add
+                {t("common.add")}
               </Button>
             </div>
           </>
@@ -688,21 +697,25 @@ export function GenericSetupWizard({
         {step === 3 ? (
           <div className="space-y-4 text-sm">
             <div className="surface-card p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">Intent</p>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                {t("wizard.reviewIntent")}
+              </p>
               <p className="mt-2 whitespace-pre-wrap leading-relaxed">
                 {intent || "—"}
               </p>
             </div>
             <div className="surface-card p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">Type</p>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                {t("wizard.reviewType")}
+              </p>
               <p className="mt-1 font-medium">{typeLabel}</p>
             </div>
             <div className="surface-card p-4">
               <p className="text-xs uppercase tracking-wide text-muted">
-                Project Areas ({selectedAreaKeys.size})
+                {t("wizard.reviewAreas", { count: selectedAreaKeys.size })}
               </p>
               <p className="mt-1 text-xs text-muted">
-                Structural folders in Focus Space — no importance.
+                {t("wizard.reviewAreasHint")}
               </p>
               <ul className="mt-2 space-y-1">
                 {allAreas
@@ -714,10 +727,10 @@ export function GenericSetupWizard({
             </div>
             <div className="surface-card p-4">
               <p className="text-xs uppercase tracking-wide text-muted">
-                Design Focuses ({selectedFocusKeys.size})
+                {t("wizard.reviewFocuses", { count: selectedFocusKeys.size })}
               </p>
               <p className="mt-1 text-xs text-muted">
-                Emphasis criteria with target importance — separate from structure.
+                {t("wizard.reviewFocusesHint")}
               </p>
               <ul className="mt-2 space-y-1">
                 {allFocuses
@@ -727,7 +740,9 @@ export function GenericSetupWizard({
                       {f.parentName ? `${f.parentName} → ` : ""}
                       {f.name}{" "}
                       <span className="text-muted">
-                        · target {importance[f.key] ?? f.targetImportance}
+                        {t("wizard.targetValue", {
+                          value: importance[f.key] ?? f.targetImportance,
+                        })}
                       </span>
                     </li>
                   ))}
@@ -745,7 +760,7 @@ export function GenericSetupWizard({
             disabled={step === 0 || busy}
             onClick={() => setStep((s) => Math.max(0, s - 1))}
           >
-            Back
+            {t("common.back")}
           </Button>
           {step === 0 ? (
             <Button
@@ -753,7 +768,9 @@ export function GenericSetupWizard({
               disabled={!intent.trim() || busy}
               onClick={generateAndContinue}
             >
-              {suggesting ? "Generating suggestions…" : "Generate suggestions"}
+              {suggesting
+                ? t("wizard.generating")
+                : t("wizard.generateSuggestions")}
             </Button>
           ) : step < steps.length - 1 ? (
             <Button
@@ -761,11 +778,11 @@ export function GenericSetupWizard({
               disabled={busy || (step === 1 && selectedAreaKeys.size === 0)}
               onClick={() => setStep((s) => s + 1)}
             >
-              Continue
+              {t("wizard.continue")}
             </Button>
           ) : (
             <Button type="button" disabled={busy} onClick={submit}>
-              {pending ? "Saving…" : "Finish setup"}
+              {pending ? t("wizard.saving") : t("wizard.finishSetup")}
             </Button>
           )}
         </div>
@@ -773,14 +790,14 @@ export function GenericSetupWizard({
 
       <ConfirmDialog
         open={leaveOpen}
-        title="Leave project setup?"
+        title={t("wizard.leaveTitle")}
         message={
           hasProgressBeyondStart()
-            ? `Discard draft project “${projectName}” and return home? Setup progress will be lost and the draft will be deleted.`
-            : `Leave setup and delete draft project “${projectName}”?`
+            ? t("wizard.leaveDiscardProgress", { name: projectName })
+            : t("wizard.leaveDiscardDraft", { name: projectName })
         }
-        cancelLabel="Stay"
-        confirmLabel={cancelling ? "Discarding…" : "Leave"}
+        cancelLabel={t("wizard.stay")}
+        confirmLabel={cancelling ? t("wizard.discarding") : t("wizard.leave")}
         pending={cancelling}
         onCancel={() => setLeaveOpen(false)}
         onConfirm={confirmLeaveSetup}

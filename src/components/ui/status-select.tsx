@@ -25,7 +25,7 @@ const STATUS_OPTION_STYLE: Record<NodeStatus, string> = {
   READY: "text-[var(--ready)]",
 };
 
-const STATUS_DOT: Record<NodeStatus, string> = {
+export const STATUS_DOT: Record<NodeStatus, string> = {
   IDEA: "bg-[var(--idea)]",
   DRAFT: "bg-[var(--draft)]",
   IN_PROGRESS: "bg-[var(--in-progress)]",

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/db/client";
 import { hasOpenAIApiKey, openAIChatMessages } from "@/features/ai/openai-client";
+import { aiLocaleInstruction } from "@/features/ai/locale-prompt";
 import { createDesignFocusAction } from "@/features/design-focus/actions";
 import { createNodeAction, updateNodeAction } from "@/features/nodes/actions";
 import { buildProjectChatContext, CHAT_SYSTEM_PROMPT } from "./context";
@@ -28,7 +29,10 @@ import {
   CHAT_PROPOSAL_MAX,
   chatParentKey,
   copyNodeSubtreeSchema,
+  dismissChatProposalsSchema,
   filterDuplicateCreateNodeProposals,
+  filterAlreadyHandledProposals,
+  fingerprintsForAppliedProposals,
   getOrCreateChatThreadSchema,
   GPT_TRANSCRIPT_MAX_CHARS,
   intendedCreateParentKey,
@@ -44,9 +48,53 @@ import { z } from "zod";
 /** Per prior-turn message cap when building the OpenAI request (latest user msg stays full). */
 const CHAT_HISTORY_MESSAGE_MAX_CHARS = 12_000;
 
+function messageMetaRecord(metadata: unknown): Record<string, unknown> | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+  return metadata as Record<string, unknown>;
+}
+
+function collectHandledProposalFingerprints(
+  messages: { proposals: unknown; metadata: unknown }[],
+): string[] {
+  const out = new Set<string>();
+  for (const m of messages) {
+    const meta = messageMetaRecord(m.metadata);
+    if (!meta) continue;
+    const applied = typeof meta.appliedAt === "string";
+    const dismissed = typeof meta.dismissedAt === "string";
+    if (!applied && !dismissed) continue;
+    const stored = meta.handledFingerprints;
+    if (Array.isArray(stored)) {
+      for (const fp of stored) {
+        if (typeof fp === "string" && fp.trim()) out.add(fp.trim());
+      }
+    }
+    if (Array.isArray(m.proposals)) {
+      const proposals = m.proposals as ChatProposal[];
+      for (const fp of fingerprintsForAppliedProposals(proposals)) {
+        out.add(fp);
+      }
+    }
+  }
+  return [...out];
+}
+
 /** Compact proposal summary so the model sees prior structured suggestions, not only teaser text. */
-function formatProposalsForHistory(proposals: unknown): string | null {
+function formatProposalsForHistory(
+  proposals: unknown,
+  metadata?: unknown,
+): string | null {
   if (!Array.isArray(proposals) || proposals.length === 0) return null;
+  const meta = messageMetaRecord(metadata);
+  const applied = typeof meta?.appliedAt === "string";
+  const dismissed = typeof meta?.dismissedAt === "string";
+  const statusLabel = applied
+    ? "ALREADY APPLIED — do not propose these again"
+    : dismissed
+      ? "DISMISSED — do not propose these again"
+      : "not applied until Accept";
   const lines: string[] = [];
   for (const raw of proposals.slice(0, 24)) {
     if (!raw || typeof raw !== "object") continue;
@@ -76,7 +124,7 @@ function formatProposalsForHistory(proposals: unknown): string | null {
     proposals.length > lines.length
       ? `\n(+${proposals.length - lines.length} more)`
       : "";
-  return `[Advisory proposals from this turn — not applied until Accept]\n${lines.join("\n")}${more}`;
+  return `[Advisory proposals from this turn — ${statusLabel}]\n${lines.join("\n")}${more}`;
 }
 /** Overall budget for context build + model call (OpenAI fetch itself caps at 90s). */
 const CHAT_SEND_OVERALL_TIMEOUT_MS = 95_000;
@@ -481,7 +529,8 @@ export async function sendChatMessageAction(
       };
     }
 
-    const { projectId, message, focusSummary, contextNodeId } = parsed.data;
+    const { projectId, message, focusSummary, contextNodeId, locale } =
+      parsed.data;
     savedProjectId = projectId;
     const project = await prisma.project.findUnique({
       where: { id: projectId },
@@ -575,7 +624,10 @@ export async function sendChatMessageAction(
           .map((m) => {
             let content = m.content;
             if (m.role === "assistant") {
-              const proposalBlock = formatProposalsForHistory(m.proposals);
+              const proposalBlock = formatProposalsForHistory(
+                m.proposals,
+                m.metadata,
+              );
               if (proposalBlock) {
                 content = `${content}\n\n${proposalBlock}`;
               }
@@ -594,7 +646,7 @@ export async function sendChatMessageAction(
           temperature: 0.4,
           jsonObject: true,
           messages: [
-            { role: "system", content: CHAT_SYSTEM_PROMPT },
+            { role: "system", content: CHAT_SYSTEM_PROMPT + aiLocaleInstruction(locale) },
             {
               role: "user",
               content: `Project context:\n${contextBlock ?? "(none)"}\n\n---\nRespond to the next user message as JSON.`,
@@ -718,6 +770,19 @@ export async function sendChatMessageAction(
           });
         }
         proposals = nestedFiltered.proposals;
+        const handledFingerprints =
+          collectHandledProposalFingerprints(priorMessages);
+        const handledFiltered = filterAlreadyHandledProposals(
+          proposals,
+          handledFingerprints,
+        );
+        if (handledFiltered.removedCount > 0) {
+          console.warn("[chat] already-applied/dismissed proposals filtered", {
+            removed: handledFiltered.removedCount,
+            kept: handledFiltered.proposals.length,
+          });
+        }
+        proposals = handledFiltered.proposals;
         // Character/NPC batches: keep a flat, concise create list.
         const createCap = isCharacterProfileCreateBatch(proposals)
           ? CHAT_CHARACTER_PROPOSAL_MAX
@@ -727,13 +792,20 @@ export async function sendChatMessageAction(
         }
         // Soft-fail: keep the text reply even when every proposal was filtered.
         if (
-          filtered.removedCount + nestedFiltered.removedCount > 0 &&
+          filtered.removedCount +
+            nestedFiltered.removedCount +
+            handledFiltered.removedCount >
+            0 &&
           proposals.length === 0
         ) {
           const notice =
-            nestedFiltered.removedCount > 0 && filtered.removedCount === 0
+            nestedFiltered.removedCount > 0 &&
+            filtered.removedCount === 0 &&
+            handledFiltered.removedCount === 0
               ? CHAT_ALL_PROPOSALS_FILTERED_MESSAGE
-              : filtered.removedCount > 0 && nestedFiltered.removedCount === 0
+              : filtered.removedCount > 0 &&
+                  nestedFiltered.removedCount === 0 &&
+                  handledFiltered.removedCount === 0
                 ? CHAT_ALL_DUPLICATES_FILTERED_MESSAGE
                 : CHAT_ALL_PROPOSALS_FILTERED_MESSAGE;
           reply = `${reply}\n\n${notice}`;
@@ -1454,6 +1526,7 @@ export async function applyChatProposalsAction(
         appliedAt: new Date().toISOString(),
         appliedCount: created.length,
         appliedIds: created.map((c) => c.id),
+        handledFingerprints: fingerprintsForAppliedProposals(proposals),
       },
     },
   });
@@ -1578,6 +1651,61 @@ export async function applyChatProposalsAction(
     thread: dto,
     copyProfileSourceIds,
   };
+}
+
+/** Persist dismiss so suggestions do not reappear on reload / remount. */
+export async function dismissChatProposalsAction(
+  raw: unknown,
+): Promise<
+  { ok: true; thread: ChatThreadDTO } | { ok: false; error: string }
+> {
+  const parsed = dismissChatProposalsSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid request",
+    };
+  }
+  const { projectId, messageId } = parsed.data;
+  const message = await prisma.chatMessage.findFirst({
+    where: { id: messageId, thread: { projectId } },
+    select: {
+      id: true,
+      threadId: true,
+      proposals: true,
+      metadata: true,
+    },
+  });
+  if (!message) return { ok: false, error: "Chat message not found" };
+
+  const meta =
+    message.metadata && typeof message.metadata === "object"
+      ? (message.metadata as Record<string, unknown>)
+      : {};
+  if (typeof meta.appliedAt === "string") {
+    const dto = await loadThreadDTO(message.threadId, projectId);
+    if (!dto) return { ok: false, error: "Could not load chat thread" };
+    return { ok: true, thread: dto };
+  }
+
+  const proposals = Array.isArray(message.proposals)
+    ? (message.proposals as ChatProposal[])
+    : [];
+
+  await prisma.chatMessage.update({
+    where: { id: messageId },
+    data: {
+      metadata: {
+        ...meta,
+        dismissedAt: new Date().toISOString(),
+        handledFingerprints: fingerprintsForAppliedProposals(proposals),
+      },
+    },
+  });
+
+  const dto = await loadThreadDTO(message.threadId, projectId);
+  if (!dto) return { ok: false, error: "Could not load chat thread" };
+  return { ok: true, thread: dto };
 }
 
 export async function clearGptAttachmentAction(

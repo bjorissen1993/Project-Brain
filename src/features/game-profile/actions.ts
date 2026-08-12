@@ -33,7 +33,7 @@ export async function suggestSetupFromIntentAction(
     };
   }
 
-  const { projectId, intentText } = parsed.data;
+  const { projectId, intentText, locale } = parsed.data;
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) {
     return { ok: false, error: "Project not found" };
@@ -42,7 +42,7 @@ export async function suggestSetupFromIntentAction(
   const ai = getAIService();
   const result = await ai.suggestSetupFromIntent(
     { projectId, intentText, projectType: project.type },
-    { modelTier: "quick" },
+    { modelTier: "quick", locale },
   );
 
   if (!result.ok || !result.data) {

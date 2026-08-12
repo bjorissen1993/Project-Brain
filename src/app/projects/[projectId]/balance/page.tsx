@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { getProject } from "@/features/projects/actions";
 import { getBalanceSnapshot } from "@/features/design-focus/balance-engine";
 import { BalanceDashboard } from "@/features/design-focus/balance-dashboard";
@@ -29,22 +28,11 @@ export default async function BalancePage({
       projectId={projectId}
       snapshot={snapshot}
       aiSlot={
-        <div className="space-y-2">
-          <BalanceAIPanel
-            projectId={projectId}
-            imbalance={imbalance}
-            improvements={improvements}
-          />
-          <p className="text-xs text-muted">
-            <Link
-              href={`/projects/${projectId}/intelligence`}
-              className="text-accent underline"
-            >
-              Open project intelligence
-            </Link>{" "}
-            for direction checks and full analysis.
-          </p>
-        </div>
+        <BalanceAIPanel
+          projectId={projectId}
+          imbalance={imbalance}
+          improvements={improvements}
+        />
       }
     />
   );

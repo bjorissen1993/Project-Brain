@@ -3,6 +3,7 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useT, type MessageKey } from "@/features/i18n";
 import type { BalanceFocusNode, BalanceSnapshot } from "./balance-engine";
 import {
   readItemsViewMode,
@@ -37,6 +38,16 @@ function statusText(status: BalanceFocusNode["status"]) {
   }
 }
 
+const STATUS_LABEL: Record<
+  BalanceFocusNode["status"],
+  MessageKey
+> = {
+  green: "balance.green",
+  orange: "balance.orange",
+  red: "balance.red",
+  neutral: "balance.neutral",
+};
+
 function BalanceRow({
   node,
   depth,
@@ -50,6 +61,7 @@ function BalanceRow({
   onToggle: (id: string) => void;
   viewMode: ItemsViewMode;
 }) {
+  const t = useT();
   const hasChildren = node.children.length > 0;
   const isOpen = expanded.has(node.id);
   const barActual = Math.min(100, Math.max(0, node.actualWeight));
@@ -96,28 +108,28 @@ function BalanceRow({
             <div className="min-w-0">
               <p className="truncate font-semibold">{node.name}</p>
               <p className="text-xs text-muted">
-                {isCards ? (
-                  <>
-                    actual {node.actualWeight}% · target{" "}
-                    {node.normalizedTargetWeight}%
-                  </>
-                ) : (
-                  <>
-                    target {node.normalizedTargetWeight}% (raw{" "}
-                    {node.targetImportance}) · {node.contributingNodeCount} Ready
-                    with content
-                  </>
-                )}
+                {isCards
+                  ? t("balance.actualTarget", {
+                      actual: node.actualWeight,
+                      target: node.normalizedTargetWeight,
+                    })
+                  : t("balance.listMeta", {
+                      target: node.normalizedTargetWeight,
+                      raw: node.targetImportance,
+                      ready: node.contributingNodeCount,
+                    })}
               </p>
             </div>
           </div>
           <div className="text-right text-xs">
             <p className={cn("font-semibold uppercase", statusText(node.status))}>
-              {node.status}
+              {t(STATUS_LABEL[node.status])}
             </p>
             <p className="text-muted">{node.directionLabel}</p>
             {!isCards ? (
-              <p className="text-muted">confidence {node.confidence}%</p>
+              <p className="text-muted">
+                {t("balance.confidence", { value: node.confidence })}
+              </p>
             ) : null}
           </div>
         </div>
@@ -129,20 +141,24 @@ function BalanceRow({
               statusColor(node.status),
             )}
             style={{ width: `${barActual}%` }}
-            title={`Actual ${node.actualWeight}%`}
+            title={t("balance.actualPct", { value: node.actualWeight })}
           />
           <div
             className="absolute top-0 bottom-0 w-0.5 bg-foreground/80"
             style={{ left: `calc(${barTarget}% - 1px)` }}
-            title={`Normalized target ${node.normalizedTargetWeight}%`}
+            title={t("balance.normTarget", {
+              value: node.normalizedTargetWeight,
+            })}
           />
         </div>
         <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wide text-muted">
-          <span>actual {node.actualWeight}%</span>
+          <span>{t("balance.actualPct", { value: node.actualWeight })}</span>
           <span>
             {isCards
-              ? `conf. ${node.confidence}%`
-              : `norm. target ${node.normalizedTargetWeight}%`}
+              ? t("balance.confShort", { value: node.confidence })
+              : t("balance.normTarget", {
+                  value: node.normalizedTargetWeight,
+                })}
           </span>
         </div>
       </div>
@@ -167,6 +183,7 @@ export function BalanceDashboard({
   snapshot: BalanceSnapshot;
   aiSlot?: React.ReactNode;
 }) {
+  const t = useT();
   const viewMode = useSyncExternalStore(
     subscribeItemsViewMode,
     readItemsViewMode,
@@ -192,11 +209,9 @@ export function BalanceDashboard({
     <div className="mx-auto w-full max-w-[1600px] space-y-6 px-6 py-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl">Balance</h1>
+          <h1 className="font-display text-3xl">{t("balance.title")}</h1>
           <p className="mt-2 max-w-prose text-sm text-muted">
-            Actual vs normalized target at every Design Focus level. Color is from
-            code thresholds (≤5 green, ≤10 orange, &gt;10 red). Confidence is
-            separate.
+            {t("balance.intro")}
           </p>
         </div>
         <ItemsViewToggle className="shrink-0" />
@@ -215,19 +230,23 @@ export function BalanceDashboard({
             <p className={cn("text-2xl font-semibold", statusText(key))}>
               {count}
             </p>
-            <p className="text-xs uppercase tracking-wide text-muted">{key}</p>
+            <p className="text-xs uppercase tracking-wide text-muted">
+              {t(STATUS_LABEL[key])}
+            </p>
           </div>
         ))}
       </div>
 
       <p className="text-xs text-muted">
-        {snapshot.readyNodeCount} Ready nodes · {snapshot.classificationCount}{" "}
-        active classifications ·{" "}
+        {t("balance.readyNodes", {
+          ready: snapshot.readyNodeCount,
+          classifications: snapshot.classificationCount,
+        })}{" "}
         <Link
           href={`/projects/${projectId}/profile#design-focus`}
           className="text-accent underline"
         >
-          Edit targets
+          {t("balance.editTargets")}
         </Link>
       </p>
 
@@ -244,7 +263,7 @@ export function BalanceDashboard({
       >
         {snapshot.roots.length === 0 ? (
           <div className="surface-card border-dashed px-4 py-6 text-sm text-muted">
-            No design focuses yet. Complete setup or add focuses first.
+            {t("balance.empty")}
           </div>
         ) : (
           snapshot.roots.map((node) => (

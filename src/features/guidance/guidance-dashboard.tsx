@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { X } from "lucide-react";
 import { structureFocusHref } from "@/features/focus-space/structure-href";
+import { useT, type MessageKey } from "@/features/i18n";
 import { iconKeyForGuidanceKind, PbIcon } from "@/lib/icons";
 import {
   GUIDANCE_VISIBLE,
@@ -11,12 +13,118 @@ import {
 } from "./build-guidance";
 import { guidanceHref } from "./guidance-href";
 
-const KIND_LABEL: Record<GuidanceKind, string> = {
-  continue: "Continue",
-  fill_in: "Fill in",
-  review: "Review",
-  continue_structure: "Continue structure",
+const KIND_KEYS: Record<GuidanceKind, MessageKey> = {
+  continue: "guidance.kindContinue",
+  fill_in: "guidance.kindFillIn",
+  review: "guidance.kindReview",
+  continue_structure: "guidance.kindContinueStructure",
 };
+
+function OpportunityCard({ op }: { op: GuidanceOpportunity }) {
+  const t = useT();
+  return (
+    <Link
+      href={op.href}
+      className="group flex h-full min-h-[12rem] flex-col gap-4 rounded-[var(--radius)] border border-border bg-panel/85 p-5 shadow-sm transition-colors hover:border-nav/45 hover:bg-nav-muted/30 md:p-6"
+    >
+      <span className="flex items-start justify-between gap-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius)] border border-border bg-panel-elevated text-muted transition-colors group-hover:border-nav/35 group-hover:text-nav md:h-14 md:w-14">
+          <PbIcon
+            icon={iconKeyForGuidanceKind(op.kind)}
+            size={32}
+            className="h-6 w-6 md:h-7 md:w-7"
+          />
+        </span>
+        <span className="rounded-[var(--radius)] border border-border/80 bg-panel-elevated/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+          {t(KIND_KEYS[op.kind])}
+        </span>
+      </span>
+      <span className="min-w-0 flex-1">
+        <p className="text-base font-semibold leading-snug text-foreground">
+          {op.title}
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          {t(op.softTextKey, op.softTextVars)}
+        </p>
+      </span>
+    </Link>
+  );
+}
+
+function OpportunitiesModal({
+  open,
+  opportunities,
+  onClose,
+}: {
+  open: boolean;
+  opportunities: GuidanceOpportunity[];
+  onClose: () => void;
+}) {
+  const t = useT();
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/55 p-3 sm:items-center sm:p-6"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="flex max-h-[min(90dvh,52rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[var(--radius)] border border-border bg-panel shadow-xl"
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4">
+          <div>
+            <p
+              id={titleId}
+              className="font-display text-lg font-semibold tracking-tight"
+            >
+              {t("guidance.allOpportunities")}
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              {t("guidance.suggestionCount", { count: opportunities.length })}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius)] text-muted transition hover:bg-muted-bg hover:text-foreground"
+            aria-label={t("common.close")}
+          >
+            <X size={18} strokeWidth={2} aria-hidden />
+          </button>
+        </div>
+        <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {opportunities.map((op) => (
+              <OpportunityCard key={op.id} op={op} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function GuidanceDashboard({
   projectId,
@@ -31,10 +139,9 @@ export function GuidanceDashboard({
   focusNodeId?: string | null;
   focusNodeName?: string | null;
 }) {
-  const [showAll, setShowAll] = useState(false);
-  const visible = showAll
-    ? opportunities
-    : opportunities.slice(0, GUIDANCE_VISIBLE);
+  const t = useT();
+  const [modalOpen, setModalOpen] = useState(false);
+  const visible = opportunities.slice(0, GUIDANCE_VISIBLE);
   const more = Math.max(0, opportunities.length - GUIDANCE_VISIBLE);
   const scoped = Boolean(focusNodeId && focusNodeName);
 
@@ -50,7 +157,7 @@ export function GuidanceDashboard({
       />
 
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
-        Guidance
+        {t("guidance.title")}
         {scoped ? ` · ${focusNodeName}` : ""}
       </p>
       <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -58,93 +165,65 @@ export function GuidanceDashboard({
       </h1>
       <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
         {scoped
-          ? `Calm next steps for “${focusNodeName}” and what’s nested under it — based on empty notes, drafts, and structure signals in this area.`
-          : "A few calm next steps based on where your project already is. Nothing here requires AI — explore at your own pace."}
+          ? t("guidance.introScoped", { name: focusNodeName! })
+          : t("guidance.intro")}
       </p>
 
       {scoped ? (
         <p className="mt-3 text-xs text-muted">
-          Scoped to this Structure folder.{" "}
+          {t("guidance.scopedHint")}{" "}
           <Link
             href={guidanceHref(projectId)}
             className="font-medium text-nav hover:text-nav-hover"
           >
-            View project-wide guidance
+            {t("guidance.viewProjectWide")}
           </Link>
         </p>
       ) : null}
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <section className="mt-8 grid gap-5 sm:grid-cols-1 lg:grid-cols-3">
         {visible.length === 0 ? (
-          <div className="rounded-[var(--radius)] border border-border bg-panel/70 px-5 py-8 text-sm text-muted sm:col-span-2 xl:col-span-3">
+          <div className="rounded-[var(--radius)] border border-border bg-panel/70 px-5 py-8 text-sm text-muted lg:col-span-3">
             {scoped
-              ? `Nothing pressing in “${focusNodeName}” right now. Explore the Structure workspace when you’re ready.`
-              : "You’re in a good place. Explore the full project when you’re ready."}
+              ? t("guidance.emptyScoped", { name: focusNodeName! })
+              : t("guidance.empty")}
           </div>
         ) : (
-          visible.map((op) => (
-            <Link
-              key={op.id}
-              href={op.href}
-              className="group flex h-full min-h-[8.5rem] flex-col gap-3 rounded-[var(--radius)] border border-border bg-panel/85 p-4 shadow-sm transition-colors hover:border-nav/45 hover:bg-nav-muted/30"
-            >
-              <span className="flex items-start justify-between gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] border border-border bg-panel-elevated text-muted transition-colors group-hover:border-nav/35 group-hover:text-nav md:h-12 md:w-12">
-                  <PbIcon
-                    icon={iconKeyForGuidanceKind(op.kind)}
-                    size={28}
-                    className="h-5 w-5 md:h-6 md:w-6"
-                  />
-                </span>
-                <span className="rounded-[var(--radius)] border border-border/80 bg-panel-elevated/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
-                  {KIND_LABEL[op.kind]}
-                </span>
-              </span>
-              <span className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-foreground">
-                  {op.title}
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                  {op.softText}
-                </p>
-              </span>
-            </Link>
-          ))
+          visible.map((op) => <OpportunityCard key={op.id} op={op} />)
         )}
       </section>
 
-      {more > 0 && !showAll ? (
+      {more > 0 ? (
         <button
           type="button"
-          onClick={() => setShowAll(true)}
-          className="mt-4 text-sm font-medium text-nav hover:text-nav-hover"
+          onClick={() => setModalOpen(true)}
+          className="mt-5 text-sm font-medium text-nav hover:text-nav-hover"
         >
-          View {more} more opportunit{more === 1 ? "y" : "ies"}
+          {t("guidance.viewMore", { count: more })}
         </button>
       ) : null}
-      {showAll && more > 0 ? (
-        <button
-          type="button"
-          onClick={() => setShowAll(false)}
-          className="mt-4 text-sm font-medium text-muted hover:text-foreground"
-        >
-          Show fewer
-        </button>
-      ) : null}
+
+      <OpportunitiesModal
+        open={modalOpen}
+        opportunities={opportunities}
+        onClose={() => setModalOpen(false)}
+      />
 
       <div className="mt-10 flex flex-wrap gap-3">
         <Link
           href={structureFocusHref(projectId, focusNodeId, "blobs")}
           className="inline-flex items-center rounded-[var(--radius)] border border-nav/40 bg-nav-muted px-4 py-2 text-sm font-medium text-nav transition-colors hover:border-nav/60 hover:bg-nav/15"
         >
-          {scoped ? `Back to ${focusNodeName}` : "Explore Structure"}
+          {scoped
+            ? t("guidance.backTo", { name: focusNodeName! })
+            : t("guidance.exploreStructure")}
         </Link>
         {!scoped ? (
           <Link
             href={structureFocusHref(projectId, null, "tree")}
             className="inline-flex items-center rounded-[var(--radius)] border border-border bg-panel px-4 py-2 text-sm font-medium text-muted transition-colors hover:border-border-strong hover:text-foreground"
           >
-            Open tree in Structure
+            {t("guidance.openTree")}
           </Link>
         ) : null}
       </div>

@@ -1,6 +1,5 @@
 /**
- * Auth foundation types — local profile today; Auth.js / NextAuth later.
- * Keep UI against these shapes so OAuth providers can plug in without redesign.
+ * Auth UI types — Auth.js session when configured; local profile otherwise.
  */
 
 export type AuthProviderId = "github" | "google" | "credentials" | "local";
@@ -10,6 +9,7 @@ export type AuthUser = {
   name: string | null;
   email: string | null;
   image: string | null;
+  githubUsername?: string | null;
 };
 
 export type AuthSession = {
@@ -21,7 +21,6 @@ export type AuthSession = {
 
 export type AuthStatus = "authenticated" | "unauthenticated" | "loading";
 
-/** Planned OAuth entry points — UI stubs until Auth.js is wired. */
 export type AuthSignInOption = {
   id: "github" | "google";
   label: string;

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Select } from "@/components/ui/field";
@@ -11,7 +11,13 @@ import { StatusSelect } from "@/components/ui/status-select";
 import { NodeAIPanel } from "@/features/analysis/node-ai-panel";
 import type { NodeAnalysisView } from "@/features/analysis/actions";
 import { CopyProfileDialog } from "@/features/chat/copy-profile-dialog";
-import { structureFocusHref } from "@/features/focus-space/structure-href";
+import {
+  parseStructureView,
+  readStructureReturn,
+  structureFocusHref,
+  structureViewRespectingBlobCap,
+  type StructureViewMode,
+} from "@/features/focus-space/structure-href";
 import {
   deleteNodeAction,
   updateNodeAction,
@@ -82,6 +88,7 @@ export function NodeDetail({
   }[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -91,11 +98,38 @@ export function NodeDetail({
     node.gamePhase ?? "",
   );
   const [copyOpen, setCopyOpen] = useState(false);
+  const fromQueryRaw = searchParams.get("fromView");
+  const queryReturnView =
+    fromQueryRaw === "tree" ||
+    fromQueryRaw === "blobs" ||
+    fromQueryRaw === "details"
+      ? parseStructureView(fromQueryRaw)
+      : null;
+  // sessionStorage is client-only; restore after mount when ?fromView= is absent.
+  const [rememberedView, setRememberedView] = useState<StructureViewMode | null>(
+    null,
+  );
 
-  const structureHref = structureFocusHref(projectId, node.id, "blobs");
+  useEffect(() => {
+    if (queryReturnView) return;
+    const t = window.setTimeout(() => {
+      const remembered = readStructureReturn(projectId);
+      if (remembered) setRememberedView(remembered.view);
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [projectId, queryReturnView]);
+
+  const returnView: StructureViewMode =
+    queryReturnView ?? rememberedView ?? "blobs";
+  const structureView = structureViewRespectingBlobCap(
+    returnView,
+    childNodes.length,
+  );
+  const structureHref = structureFocusHref(projectId, node.id, structureView);
+  const afterDeleteView = structureViewRespectingBlobCap(returnView, 0);
   const afterDeleteHref = node.parentId
-    ? structureFocusHref(projectId, node.parentId, "blobs")
-    : structureFocusHref(projectId, null, "blobs");
+    ? structureFocusHref(projectId, node.parentId, afterDeleteView)
+    : structureFocusHref(projectId, null, afterDeleteView);
   const canCopyProfile = (node.childCount ?? 0) > 0;
 
   const parentPath = useMemo(() => {

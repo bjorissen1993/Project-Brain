@@ -244,6 +244,14 @@ export const updateNodeSchema = z.object({
   sortOrder: z.number().int().optional(),
 });
 
+/** Reparent + sibling index for Structure / Project Tree drag-and-drop. */
+export const moveNodeInTreeSchema = z.object({
+  id: z.string().min(1),
+  parentId: z.string().nullable(),
+  /** 0-based index among siblings under parentId after the move (excluding self). */
+  index: z.number().int().min(0).max(10_000),
+});
+
 export const combineNotesSchema = z.object({
   projectId: z.string().min(1),
   parentNodeId: z.string().optional().nullable(),
@@ -281,6 +289,24 @@ export const createRelationSchema = z.object({
   label: z.string().trim().max(160).optional().nullable(),
 });
 
+/** Persist linked GitHub repo as owner/name (empty clears). */
+export const updateProjectGithubRepoSchema = z.object({
+  projectId: z.string().min(1),
+  githubRepo: z
+    .string()
+    .trim()
+    .max(200)
+    .refine(
+      (value) =>
+        value === "" ||
+        /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value) ||
+        /^https?:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/?$/.test(
+          value,
+        ),
+      "Use owner/name or a github.com URL",
+    ),
+});
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type GameSetupInput = z.infer<typeof gameSetupSchema>;
 export type GenericSetupInput = z.infer<typeof genericSetupSchema>;
@@ -289,3 +315,7 @@ export type AbandonProjectSetupInput = z.infer<typeof abandonProjectSetupSchema>
 export type ToggleProjectFavoriteInput = z.infer<typeof toggleProjectFavoriteSchema>;
 export type CreateNodeInput = z.infer<typeof createNodeSchema>;
 export type UpdateNodeInput = z.infer<typeof updateNodeSchema>;
+export type MoveNodeInTreeInput = z.infer<typeof moveNodeInTreeSchema>;
+export type UpdateProjectGithubRepoInput = z.infer<
+  typeof updateProjectGithubRepoSchema
+>;

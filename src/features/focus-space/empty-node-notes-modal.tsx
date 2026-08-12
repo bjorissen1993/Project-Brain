@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { updateNodeAction } from "@/features/nodes/actions";
@@ -25,6 +26,19 @@ function EmptyNodeNotesForm({
   const [content, setContent] = useState(initialContent);
   const [pending, startTransition] = useTransition();
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
   const saveContent = (): Promise<boolean> =>
     new Promise((resolve) => {
       startTransition(async () => {
@@ -41,9 +55,10 @@ function EmptyNodeNotesForm({
       });
     });
 
-  return (
+  // Portal to body so Structure chrome (backdrop-blur) cannot trap fixed overlays.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] sm:items-center"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -53,7 +68,7 @@ function EmptyNodeNotesForm({
         role="dialog"
         aria-modal="true"
         aria-labelledby="empty-node-notes-title"
-        className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-[var(--radius)] border border-border bg-panel p-5 shadow-xl sm:p-6"
+        className="max-h-[min(90dvh,calc(100dvh-2rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)))] w-full max-w-xl overflow-y-auto rounded-[var(--radius)] border border-border bg-panel p-5 shadow-xl sm:p-6"
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
@@ -115,7 +130,8 @@ function EmptyNodeNotesForm({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

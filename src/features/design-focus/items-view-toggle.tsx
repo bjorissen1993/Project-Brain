@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/features/i18n";
 import {
   readItemsViewMode,
   saveItemsViewMode,
@@ -21,6 +22,7 @@ export function ItemsViewToggle({
   mode?: ItemsViewMode;
   onChange?: (mode: ItemsViewMode) => void;
 }) {
+  const t = useT();
   const stored = useSyncExternalStore(
     subscribeItemsViewMode,
     readItemsViewMode,
@@ -40,12 +42,16 @@ export function ItemsViewToggle({
         className,
       )}
       role="group"
-      aria-label="Item display"
+      aria-label={t("common.view")}
     >
       {(
         [
-          { id: "list" as const, label: "List", Icon: List },
-          { id: "cards" as const, label: "Cards", Icon: LayoutGrid },
+          { id: "list" as const, label: t("designFocus.viewList"), Icon: List },
+          {
+            id: "cards" as const,
+            label: t("designFocus.viewCards"),
+            Icon: LayoutGrid,
+          },
         ] as const
       ).map(({ id, label, Icon }) => {
         const active = mode === id;
