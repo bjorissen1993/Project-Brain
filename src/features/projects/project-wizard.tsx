@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FieldError, Input, Label } from "@/components/ui/field";
 import { useT, type MessageKey } from "@/features/i18n";
 import { createProjectAction } from "@/features/projects/actions";
+import { rememberOrphanProjectId } from "@/features/projects/orphan-projects";
 import { iconKeyForProjectType, PbIcon } from "@/lib/icons";
 import { PROJECT_TYPE_OPTIONS, type ProjectType } from "@/types";
 import { cn } from "@/lib/utils";
@@ -183,9 +184,14 @@ export function ProjectWizard() {
                     type,
                     customTypeLabel: customTypeLabel || undefined,
                   });
-                  if (result && !result.ok) {
-                    setError(result.error);
+                  if (!result || !result.ok) {
+                    setError(result?.error ?? t("setup.createFailed"));
+                    return;
                   }
+                  if (result.orphan) {
+                    rememberOrphanProjectId(result.projectId);
+                  }
+                  router.push(`/projects/${result.projectId}/setup`);
                 });
               }}
             >

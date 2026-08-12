@@ -26,6 +26,7 @@ import {
   type LocaleId,
   type ThemeId,
 } from "@/features/preferences";
+import { ClaimUnownedSettings } from "@/features/projects/claim-unowned-settings";
 import { cn } from "@/lib/utils";
 
 function PrefSection({
@@ -48,7 +49,15 @@ function PrefSection({
   );
 }
 
-export function UserSettingsPanel({ projectId }: { projectId?: string }) {
+export function UserSettingsPanel({
+  projectId,
+  showClaimUnowned = false,
+  unownedCount = 0,
+}: {
+  projectId?: string;
+  showClaimUnowned?: boolean;
+  unownedCount?: number;
+}) {
   const router = useRouter();
   const { locale, t } = useTranslations();
   const nameId = useId();
@@ -148,6 +157,15 @@ export function UserSettingsPanel({ projectId }: { projectId?: string }) {
       </p>
 
       <div className="mt-8 space-y-4">
+        {showClaimUnowned ? (
+          <PrefSection
+            title={t("settings.claimUnownedTitle")}
+            description={t("settings.claimUnownedIntro")}
+          >
+            <ClaimUnownedSettings unownedCount={unownedCount} />
+          </PrefSection>
+        ) : null}
+
         <PrefSection
           title={t("settings.displayName")}
           description={t("settings.displayNameDesc")}

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/db/client";
+import { isAuthEnabled } from "@/lib/auth/allowlist";
 import {
   abandonProjectSetupSchema,
   createProjectSchema,
@@ -20,6 +21,11 @@ import { assessGenreIntentAlignment } from "@/features/ai/genre-intent-alignment
 import { getAIService } from "@/features/ai";
 import type { GenreIntentAlignment } from "@/features/ai/genre-intent-alignment-schema";
 import { isGameProjectType } from "@/features/projects/type-templates";
+import {
+  canAccessProject,
+  getSessionUser,
+  requireSessionUserWhenAuthEnabled,
+} from "./ownership";
 import {
   buildProjectExportPayload,
   formatProjectExportMarkdown,
@@ -50,7 +56,15 @@ async function ensureGenresExist(keys: string[]) {
 }
 
 export async function listProjects() {
+  const user = await getSessionUser();
+  // Auth on: only projects owned by the current user.
+  // Auth off (anonymous workspace): show everything.
+  if (isAuthEnabled() && !user) {
+    return [];
+  }
+
   return prisma.project.findMany({
+    where: user ? { userId: user.id } : undefined,
     orderBy: { updatedAt: "desc" },
     include: {
       gameProfile: true,
@@ -183,7 +197,7 @@ export async function listProjectsForHome(): Promise<HomeProjectItem[]> {
 }
 
 export async function getProject(projectId: string) {
-  return prisma.project.findUnique({
+  const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
       gameProfile: true,
@@ -217,12 +231,25 @@ export async function getProject(projectId: string) {
       },
     },
   });
+  if (!project) return null;
+  const user = await getSessionUser();
+  if (!canAccessProject(project, user)) return null;
+  return project;
 }
 
+/**
+ * Create a project. When auth is enabled, requires sign-in and sets userId.
+ * Returns projectId so the client can remember anonymous orphans before redirect.
+ */
 export async function createProjectAction(raw: unknown) {
   const parsed = createProjectSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const gate = await requireSessionUserWhenAuthEnabled();
+  if (!gate.ok) {
+    return { ok: false as const, error: gate.error };
   }
 
   const data = parsed.data;
@@ -234,11 +261,17 @@ export async function createProjectAction(raw: unknown) {
       customTypeLabel: data.customTypeLabel,
       status: "DRAFT",
       setupCompleted: false,
+      userId: gate.user?.id ?? null,
     },
   });
 
   revalidatePath("/");
-  redirect(`/projects/${project.id}/setup`);
+  return {
+    ok: true as const,
+    projectId: project.id,
+    /** True when created without an owner (anonymous workspace / auth off). */
+    orphan: project.userId == null,
+  };
 }
 
 export async function completeGameSetupAction(raw: unknown) {
@@ -250,6 +283,10 @@ export async function completeGameSetupAction(raw: unknown) {
   const data = parsed.data;
   const project = await prisma.project.findUnique({ where: { id: data.projectId } });
   if (!project) {
+    return { ok: false as const, error: "Project not found" };
+  }
+  const sessionUser = await getSessionUser();
+  if (!canAccessProject(project, sessionUser)) {
     return { ok: false as const, error: "Project not found" };
   }
   if (project.type !== "GAME") {
@@ -411,6 +448,10 @@ export async function completeGenericSetupAction(raw: unknown) {
   const data = parsed.data;
   const project = await prisma.project.findUnique({ where: { id: data.projectId } });
   if (!project) {
+    return { ok: false as const, error: "Project not found" };
+  }
+  const sessionUser = await getSessionUser();
+  if (!canAccessProject(project, sessionUser)) {
     return { ok: false as const, error: "Project not found" };
   }
   if (isGameProjectType(project.type)) {
@@ -591,6 +632,10 @@ export async function updateProjectGenresAction(
   if (!project) {
     return { ok: false, error: "Project not found" };
   }
+  const genresUser = await getSessionUser();
+  if (!canAccessProject(project, genresUser)) {
+    return { ok: false, error: "Project not found" };
+  }
   if (!isGameProjectType(project.type)) {
     return {
       ok: false,
@@ -735,6 +780,10 @@ export async function exportProjectAction(raw: unknown) {
   if (!project) {
     return { ok: false as const, error: "Project not found" };
   }
+  const exportUser = await getSessionUser();
+  if (!canAccessProject(project, exportUser)) {
+    return { ok: false as const, error: "Project not found" };
+  }
 
   const payload = buildProjectExportPayload(project);
   const content =
@@ -770,9 +819,13 @@ export async function abandonProjectSetupAction(raw: unknown) {
   const { projectId } = parsed.data;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { id: true, setupCompleted: true, status: true },
+    select: { id: true, setupCompleted: true, status: true, userId: true },
   });
   if (!project) {
+    return { ok: false as const, error: "Project not found" };
+  }
+  const abandonUser = await getSessionUser();
+  if (!canAccessProject(project, abandonUser)) {
     return { ok: false as const, error: "Project not found" };
   }
   if (project.setupCompleted || project.status !== "DRAFT") {
@@ -816,9 +869,13 @@ export async function toggleProjectFavoriteAction(raw: unknown) {
   try {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true },
+      select: { id: true, userId: true },
     });
     if (!project) {
+      return { ok: false as const, error: "Project not found" };
+    }
+    const favoriteUser = await getSessionUser();
+    if (!canAccessProject(project, favoriteUser)) {
       return { ok: false as const, error: "Project not found" };
     }
 
@@ -864,9 +921,13 @@ export async function deleteProjectAction(raw: unknown) {
   const { projectId, confirmName } = parsed.data;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, userId: true },
   });
   if (!project) {
+    return { ok: false as const, error: "Project not found" };
+  }
+  const sessionUser = await getSessionUser();
+  if (!canAccessProject(project, sessionUser)) {
     return { ok: false as const, error: "Project not found" };
   }
   const nameMatches =
@@ -909,9 +970,13 @@ export async function updateProjectGithubRepoAction(raw: unknown) {
   const githubRepo = normalizeGithubRepo(parsed.data.githubRepo);
   const project = await prisma.project.findUnique({
     where: { id: parsed.data.projectId },
-    select: { id: true },
+    select: { id: true, userId: true },
   });
   if (!project) {
+    return { ok: false as const, error: "Project not found" };
+  }
+  const githubUser = await getSessionUser();
+  if (!canAccessProject(project, githubUser)) {
     return { ok: false as const, error: "Project not found" };
   }
 

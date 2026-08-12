@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/db/client";
+import { getOwnershipSettingsBootstrap } from "@/features/projects/claim-actions";
+import { canAccessProject, getSessionUser } from "@/features/projects/ownership";
 import { UserSettingsPanel } from "@/features/preferences/user-settings-panel";
 
 export default async function UserSettingsPage({
@@ -10,9 +12,23 @@ export default async function UserSettingsPage({
   const { projectId } = await params;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { id: true },
+    select: { id: true, userId: true },
   });
   if (!project) notFound();
+  const user = await getSessionUser();
+  if (!canAccessProject(project, user)) notFound();
 
-  return <UserSettingsPanel projectId={projectId} />;
+  const ownership = await getOwnershipSettingsBootstrap();
+
+  return (
+    <UserSettingsPanel
+      projectId={projectId}
+      showClaimUnowned={
+        ownership.authEnabled &&
+        ownership.signedIn &&
+        ownership.allowlisted
+      }
+      unownedCount={ownership.unownedCount}
+    />
+  );
 }

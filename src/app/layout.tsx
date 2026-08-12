@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, DM_Sans } from "next/font/google";
 import { AuthSessionProvider } from "@/features/auth";
+import { ClaimOrphansOnLogin } from "@/features/projects/claim-orphans-on-login";
 import { PREFS_BOOT_SCRIPT, UserPrefsProvider } from "@/features/preferences";
 import "./globals.css";
 
@@ -43,6 +44,7 @@ export default function RootLayout({
       </head>
       <body className={`${display.variable} ${body.variable} antialiased`}>
         <AuthSessionProvider>
+          <ClaimOrphansOnLogin />
           <UserPrefsProvider>{children}</UserPrefsProvider>
         </AuthSessionProvider>
       </body>

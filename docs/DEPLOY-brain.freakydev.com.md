@@ -19,6 +19,8 @@ Production URL target: **`https://brain.freakydev.com`** (HTTPS verplicht voor G
 - Login-pagina `/login`, denial-pagina `/auth/denied`
 - Prisma-modellen: `User`, `Account`, `Session`, `VerificationToken`
 - Projectveld `githubRepo` (`owner/name`) + UI op Project Profile
+- Project-eigendom: `Project.userId` (nullable voor legacy). Met auth aan: inloggen verplicht om te maken; lijst toont alleen jouw projecten.
+- Na login: browser-orphans (`localStorage` `pb:orphan-project-ids`) worden gekoppeld; als jij de enige user bent (allowlist) worden alle `userId: null` projecten automatisch geclaimd. Handmatig: **Instellingen → Alle ongeclaimde projecten claimen**.
 - `.env.example` met productie-placeholders
 
 Zonder `AUTH_SECRET` + provider-secrets blijft lokale anonieme mode werken.
@@ -112,7 +114,8 @@ OPENAI_API_KEY="..."   # optioneel maar nodig voor AI-features
 1. Open **`https://brain.freakydev.com`** (niet `http://`)
 2. Log in met Google of GitHub (account moet op de allowlist staan)
 3. In het profielmenu: koppel de andere provider terwijl je ingelogd bent
-4. Open een project → Profile → **GitHub repository** → sla `owner/name` op
+4. **Bestaande projecten (Chimera e.d.):** na `prisma migrate deploy` → ga naar **Instellingen** → klik **Alle ongeclaimde projecten claimen** (of wacht op auto-claim als jij de enige user bent)
+5. Open een project → Profile → **GitHub repository** → sla `owner/name` op
 
 ### 7. Smoke checks
 
@@ -120,6 +123,8 @@ OPENAI_API_KEY="..."   # optioneel maar nodig voor AI-features
 - [ ] Uitloggen → opnieuw `/login`
 - [ ] Beide providers gekoppeld aan één user (database: één `User`, twee `Account`-rijen)
 - [ ] `githubRepo` zichtbaar na refresh op Profile
+- [ ] Nieuw project krijgt `userId` van de ingelogde user; lijst toont alleen eigen projecten
+- [ ] Instellingen → claim ongeclaimde projecten werkt voor allowlisted account
 
 ### 8. Google login werkt niet — checklist
 
