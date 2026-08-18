@@ -208,6 +208,8 @@
     "nothingToPaste": "Niets om te plakken",
     "onlyNotesCombine": "Alleen notities kunnen worden gecombineerd",
     "resizeTree": "Boomdeel formaat wijzigen",
+    "expandTree": "Structuurboom tonen",
+    "collapseTree": "Structuurboom verbergen",
     "note": "Notitie",
     "notes": "Notities",
     "image": "Afbeelding",

@@ -13,13 +13,21 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { ArrowUp, Info } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  FolderTree,
+  Info,
+} from "lucide-react";
 import { ContextMenu } from "@/components/ui/context-menu";
 import { StatusSelect } from "@/components/ui/status-select";
 import { copyNodeSubtreeAction } from "@/features/chat/actions";
 import { isNodeContentEmpty } from "@/features/nodes/node-empty";
 import { updateNodeAction } from "@/features/nodes/actions";
 import { createRelationAction } from "@/features/relations/actions";
+import { useT } from "@/features/i18n";
+import { cn } from "@/lib/utils";
 import type { NodeStatus } from "@/types";
 import { AddStructureBlobControl } from "./add-structure-blob-control";
 import {
@@ -50,7 +58,6 @@ import {
   type StructureViewMode,
 } from "./structure-href";
 import { useFocusWorkspace } from "./focus-interaction-context";
-import { useT } from "@/features/i18n";
 
 const TREE_WIDTH_STORAGE_KEY = "pb:structure-tree-width";
 const TREE_WIDTH_DEFAULT = 352;
@@ -114,6 +121,8 @@ export function FocusSpaceView({ nodeId }: { nodeId: string | null }) {
   const [, startTransition] = useTransition();
   const [treeWidth, setTreeWidth] = useState(TREE_WIDTH_DEFAULT);
   const [resizingTree, setResizingTree] = useState(false);
+  /** Mobile only: tree pane starts collapsed to save vertical space. */
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const [headerStatus, setHeaderStatus] = useState<NodeStatus>("IDEA");
   const [headerStatusError, setHeaderStatusError] = useState<string | null>(
     null,
@@ -467,10 +476,10 @@ export function FocusSpaceView({ nodeId }: { nodeId: string | null }) {
         }}
       />
 
-      <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden px-4 pt-5 sm:px-8 sm:pt-5">
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden px-4 pt-2 sm:px-8 sm:pt-5">
         {/* Level chrome stays visible; only tree / details (and blobs canvas) scroll below. */}
-        <div className="shrink-0 space-y-4 bg-background/90 pb-2 backdrop-blur-sm sm:space-y-4 sm:pb-1">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="shrink-0 space-y-2 bg-background/90 pb-1 backdrop-blur-sm sm:space-y-4 sm:pb-1">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <div className="min-w-0">
               {parentHref ? (
                 <Link
@@ -483,11 +492,12 @@ export function FocusSpaceView({ nodeId }: { nodeId: string | null }) {
               ) : null}
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-2 sm:items-end sm:gap-1">
-              <h1 className="min-w-0 truncate font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            {/* Mobile: title + brain/+ on one row; sm+: title above controls (desktop). */}
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-col sm:items-end sm:gap-1">
+              <h1 className="min-w-0 flex-1 truncate font-display text-2xl font-semibold tracking-tight text-foreground sm:flex-none sm:text-3xl">
                 {level.name}
               </h1>
-              <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
                 {currentNode ? (
                   <StatusSelect
                     value={headerStatus}
@@ -516,7 +526,9 @@ export function FocusSpaceView({ nodeId }: { nodeId: string | null }) {
                 />
               </div>
               {headerStatusError ? (
-                <p className="text-xs text-danger">{headerStatusError}</p>
+                <p className="w-full text-xs text-danger sm:w-auto">
+                  {headerStatusError}
+                </p>
               ) : null}
             </div>
           </div>
@@ -534,13 +546,37 @@ export function FocusSpaceView({ nodeId }: { nodeId: string | null }) {
           ) : null}
         </div>
 
-        <div className="relative mt-5 min-h-0 flex-1 overflow-hidden sm:mt-4">
+        <div className="relative mt-2 min-h-0 flex-1 overflow-hidden sm:mt-4">
           {view === "tree" ? (
             <div
-              className={`relative flex h-full min-h-0 flex-col gap-4 lg:flex-row lg:gap-0 lg:overflow-hidden lg:rounded-[var(--radius)] lg:border lg:border-border/80 ${
-                resizingTree ? "lg:select-none" : ""
-              }`}
+              className={cn(
+                "relative flex h-full min-h-0 flex-col gap-2 lg:flex-row lg:gap-0 lg:overflow-hidden lg:rounded-[var(--radius)] lg:border lg:border-border/80",
+                mobileTreeOpen && "max-lg:gap-4",
+                resizingTree && "lg:select-none",
+              )}
             >
+              <button
+                type="button"
+                className="flex w-full shrink-0 items-center justify-between gap-2 rounded-[var(--radius)] border border-border/80 bg-panel/50 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-nav/40 hover:bg-nav-muted/40 lg:hidden"
+                aria-expanded={mobileTreeOpen}
+                aria-controls="structure-tree-pane"
+                aria-label={
+                  mobileTreeOpen
+                    ? t("structure.collapseTree")
+                    : t("structure.expandTree")
+                }
+                onClick={() => setMobileTreeOpen((open) => !open)}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <FolderTree size={16} strokeWidth={2.25} aria-hidden />
+                  {t("structure.tree")}
+                </span>
+                {mobileTreeOpen ? (
+                  <ChevronDown size={16} strokeWidth={2.25} aria-hidden />
+                ) : (
+                  <ChevronRight size={16} strokeWidth={2.25} aria-hidden />
+                )}
+              </button>
               {linkToolActive ? (
                 <div className="absolute left-2 top-2 z-30 flex max-w-sm flex-wrap items-center gap-2 rounded-[var(--radius)] border border-nav/40 bg-panel/95 px-3 py-1.5 text-xs text-foreground shadow-sm backdrop-blur">
                   <span>
@@ -558,7 +594,13 @@ export function FocusSpaceView({ nodeId }: { nodeId: string | null }) {
                 </div>
               ) : null}
               <aside
-                className="relative min-h-0 w-full shrink-0 overflow-hidden rounded-[var(--radius)] border border-border/80 bg-panel/40 max-lg:h-[min(38dvh,16rem)] max-lg:min-h-[11rem] lg:h-full lg:w-[min(var(--structure-tree-width),45%)] lg:min-w-[220px] lg:max-w-[560px] lg:rounded-none lg:border-0 lg:border-r lg:border-border/80"
+                id="structure-tree-pane"
+                className={cn(
+                  "relative min-h-0 w-full shrink-0 overflow-hidden rounded-[var(--radius)] border border-border/80 bg-panel/40 lg:h-full lg:w-[min(var(--structure-tree-width),45%)] lg:min-w-[220px] lg:max-w-[560px] lg:rounded-none lg:border-0 lg:border-r lg:border-border/80",
+                  mobileTreeOpen
+                    ? "max-lg:h-[min(38dvh,16rem)] max-lg:min-h-[11rem]"
+                    : "max-lg:hidden",
+                )}
                 style={
                   {
                     "--structure-tree-width": `${treeWidth}px`,
@@ -690,7 +732,7 @@ export function FocusSpaceView({ nodeId }: { nodeId: string | null }) {
           )}
         </div>
 
-        <div className="safe-pb relative mt-3 flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border/60 py-3.5 text-xs text-muted/90 sm:mt-2 sm:gap-2 sm:py-4 sm:text-muted">
+        <div className="safe-pb relative mt-3 hidden shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border/60 py-3.5 text-xs text-muted/90 sm:mt-2 sm:flex sm:gap-2 sm:py-4 sm:text-muted">
           <span className="leading-relaxed">
             {t("focusSpace.directChild", { count: level.slices.length })}
             {level.totalContainedNodes > 0

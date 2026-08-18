@@ -208,6 +208,8 @@
     "nothingToPaste": "Nothing to paste",
     "onlyNotesCombine": "Only notes can be combined",
     "resizeTree": "Resize tree pane",
+    "expandTree": "Show structure tree",
+    "collapseTree": "Hide structure tree",
     "note": "Note",
     "notes": "Notes",
     "image": "Image",
